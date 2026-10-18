@@ -1,0 +1,89 @@
+name: Auto-merge passing PRs
+
+on:
+  workflow_run:
+    types: [completed]
+
+permissions:
+  checks: read
+  contents: write
+  pull-requests: write
+  statuses: read
+
+jobs:
+  merge:
+    if: github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Merge only a fully green PR head
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const run = context.payload.workflow_run;
+            const { owner, repo } = context.repo;
+            const fullName = `${owner}/${repo}`.toLowerCase();
+            let numbers = [...new Set((run.pull_requests || []).map(pr => pr.number).filter(Number.isInteger))];
+
+            if (numbers.length === 0) {
+              const open = await github.paginate(github.rest.pulls.list, {
+                owner, repo, state: "open", head: `${owner}:${run.head_branch}`, per_page: 100
+              });
+              numbers = open.filter(pr => pr.head.sha === run.head_sha).map(pr => pr.number);
+            }
+
+            if (numbers.length === 0) {
+              core.info("No open PR is associated with this successful workflow run.");
+              return;
+            }
+
+            for (const number of numbers) {
+              const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: number });
+              if (pr.state !== "open" || pr.draft) {
+                core.info(`Skipping #${number}: PR is closed or draft.`);
+                continue;
+              }
+              if (!pr.head.repo || `${pr.head.repo.full_name}`.toLowerCase() !== fullName) {
+                core.info(`Skipping #${number}: only same-repository branches are auto-merged.`);
+                continue;
+              }
+              if (pr.head.sha !== run.head_sha) {
+                core.info(`Skipping #${number}: this CI run is for a stale head.`);
+                continue;
+              }
+
+              const checks = await github.paginate(github.rest.checks.listForRef, {
+                owner, repo, ref: pr.head.sha, per_page: 100
+              });
+              if (checks.length === 0) {
+                core.info(`Skipping #${number}: no completed check-runs are available for ${pr.head.sha}.`);
+                continue;
+              }
+              const newestByName = new Map();
+              for (const check of checks.sort((a, b) =>
+                Date.parse(a.started_at || a.created_at) - Date.parse(b.started_at || b.created_at))) {
+                newestByName.set(check.name, check);
+              }
+              const allowed = new Set(["success", "neutral", "skipped"]);
+              const notGreen = [...newestByName.values()].filter(check =>
+                check.status !== "completed" || !allowed.has(check.conclusion));
+              const combined = await github.rest.repos.getCombinedStatusForRef({
+                owner, repo, ref: pr.head.sha
+              });
+              const statusesPendingOrFailed = combined.data.total_count > 0 && combined.data.state !== "success";
+
+              if (notGreen.length || statusesPendingOrFailed) {
+                core.info(`Skipping #${number}: not all checks/statuses for ${pr.head.sha} are green.`);
+                for (const check of notGreen) core.info(`${check.name}: ${check.status}/${check.conclusion}`);
+                continue;
+              }
+
+              try {
+                const merged = await github.rest.pulls.merge({
+                  owner, repo, pull_number: number, merge_method: "merge"
+                });
+                if (merged.data.merged) core.notice(`Merged #${number} after all checks passed.`);
+                else core.warning(`GitHub did not merge #${number}: ${merged.data.message || "no message"}`);
+              } catch (error) {
+                core.warning(`Could not merge #${number}; branch protection, review, or conflicts may still block it: ${error.message}`);
+              }
+            }
