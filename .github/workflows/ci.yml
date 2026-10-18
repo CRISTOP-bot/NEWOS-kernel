@@ -22,8 +22,6 @@ jobs:
           test -s core/core_selftest.c
           gcc --version
           gcc \
-            -std=gnu2x \
-            -D__STDC_VERSION__=202311L \
             -ffreestanding \
             -fno-builtin \
             -fno-stack-protector \
