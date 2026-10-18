@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  c-syntax:
+    name: Kernel C syntax
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Syntax-check every C translation unit
+        shell: bash
+        run: |
+          mapfile -d '' sources < <(find . -type f -name '*.c' -print0 | sort -z)
+          if ((${#sources[@]} == 0)); then
+            echo '::error::No C source files found; refusing to report a vacuous pass.'
+            exit 1
+          fi
+          printf 'Syntax-checking %d C translation units.\n' "${#sources[@]}"
+          gcc --version
+          gcc \
+            -std=gnu11 \
+            -ffreestanding \
+            -fno-builtin \
+            -fno-stack-protector \
+            -mno-red-zone \
+            -mno-sse \
+            -mno-mmx \
+            -mgeneral-regs-only \
+            -fsyntax-only \
+            -I. -Iinclude -Ilib/kernel -Iarch/x86_64/include \
+            "${sources[@]}"
