@@ -1,5 +1,6 @@
 #include <fs/vfs.h>
 #include <core/core_printk.h>
+#include <core/core_version.h>
 #include <fs/tmpfs.h>
 #include <iru_string.h>
 
@@ -184,20 +185,20 @@ void initramfs_init(void)
         "users:x:100:\n"
         "user:x:1000:user\n";
     static const char shells[] = "/bin/sh\n";
-    static const char issue[] = "NEWOS 0.3.0 \\n \\m (x86_64)\n\n";
+    static const char issue[] = "NEWOS " NEWOS_VERSION " \\n \\m (x86_64)\n\n";
     static const char profile[] =
         "# Per-user shell setup for NEWOS.\n"
         "# Built-in programs are in /bin; installed tools are in /usr/bin.\n";
     static const char motd[] =
         "\n"
-        "  NEWOS 0.3.0 (x86_64) - nsh shell\n"
+        "  NEWOS " NEWOS_VERSION " (x86_64) - nsh shell\n"
         "  Type 'help' for commands.\n"
         "\n";
     static const char os_release[] =
         "NAME=\"NEWOS\"\n"
-        "PRETTY_NAME=\"NEWOS 0.3.0\"\n"
+        "PRETTY_NAME=\"NEWOS " NEWOS_VERSION "\"\n"
         "ID=newos\n"
-        "VERSION_ID=\"0.3.0\"\n"
+        "VERSION_ID=\"" NEWOS_VERSION_ID "\"\n"
         "VERSION_CODENAME=\"gui\"\n"
         "HOME_URL=\"https://github.com/CRISTOP-bot/NEWOS\"\n";
     static const char distro_readme[] =

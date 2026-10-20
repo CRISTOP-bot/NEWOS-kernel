@@ -21,7 +21,8 @@
 #include <core/core_time.h>
 #include <crypto/crypto.h>
 
-#define NEWOS_VERSION "0.3.0-gui"
+#include <core/core_version.h>
+
 #define NEWOS_TARGET  "x86_64"
 
 int run_phase2_tests(void);

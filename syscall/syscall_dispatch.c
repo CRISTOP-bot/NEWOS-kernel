@@ -11,6 +11,7 @@
 #include <core/core_printk.h>
 #include <core/core_console.h>
 #include <core/core_time.h>
+#include <core/core_version.h>
 #include <abi/syscall_abi.h>
 #include <iru_string.h>
 #include <x86_cpu.h>
@@ -787,7 +788,7 @@ long syscall_dispatch(struct x64_iframe *f)
         memset(&u, 0, sizeof(u));
         strcpy(u.sysname, "NEWOS");
         strcpy(u.nodename, "newos");
-        strcpy(u.release, "0.3.0");
+        strcpy(u.release, NEWOS_VERSION);
         strcpy(u.version, "Limine " __DATE__);
         strcpy(u.machine, "x86_64");
         strcpy(u.domainname, "(none)");
