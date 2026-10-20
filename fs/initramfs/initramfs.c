@@ -249,7 +249,7 @@ void initramfs_init(void)
     vfs_create("/etc/version");
     struct vfs_file *f = vfs_open("/etc/version", VFS_O_READ | VFS_O_WRITE);
     if (f) {
-        static const char banner[] = "NEWOS 0.2.0-pre-alpha\n";
+        static const char banner[] = "NEWOS " NEWOS_VERSION "\n";
         vfs_write(f, banner, sizeof(banner) - 1);
         vfs_close(f);
     }

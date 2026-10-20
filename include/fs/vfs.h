@@ -66,8 +66,9 @@ int  vfs_create(const char *path);
 /* Remove a file or an empty directory. Refuses non-empty directories. */
 int  vfs_unlink(const char *path);
 /* Move oldpath onto newpath, replacing the destination. Both paths must be
- * absolute and resolve inside the in-memory tree (tmpfs, devfs, sysfs):
- * on-disk filesystems keep their own directory state and are refused. */
+ * absolute and resolve inside the writable in-memory tree (tmpfs and the
+ * VFS core directories): synthetic trees (devfs, procfs, sysfs) and
+ * on-disk filesystems keep their own state and are refused. */
 int  vfs_rename(const char *oldpath, const char *newpath);
 struct vfs_file *vfs_open(const char *path, int flags);
 struct vfs_file *vfs_open_inode(struct vfs_inode *inode, int flags);

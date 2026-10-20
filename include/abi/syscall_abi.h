@@ -88,18 +88,6 @@
 #define SYS_READDIR    457   /* legacy nsh_dirent form, path-based */
 #define SYS_GETTIME    458   /* CMOS nsh_time form */
 #define SYS_SYSINFO    459
-#define SYS_SOCKET     460
-#define SYS_BIND       461
-#define SYS_CONNECT    462
-#define SYS_ACCEPT     463
-#define SYS_LISTEN     464
-#define SYS_SENDTO     465
-#define SYS_RECVFROM   466
-#define SYS_GETSOCKNAME 467
-#define SYS_GETPEERNAME 468
-#define SYS_SHUTDOWN   469
-#define SYS_SEND       470   /* stream send, no peer address */
-#define SYS_RECV       471   /* stream recv, no peer address */
 
 /* SEEK_* for SYS_LSEEK (rdi=fd, rsi=offset, rdx=whence; returns new pos). */
 #define SEEK_SET 0

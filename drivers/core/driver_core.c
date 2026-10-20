@@ -111,6 +111,18 @@ int device_bind(struct device *dev, struct driver *drv)
     return 0;
 }
 
+void device_model_for_each(device_visit_fn fn, void *arg)
+{
+    if (!fn)
+        return;
+
+    struct list_node *node;
+    LIST_FOR_EACH(node, &g_device_list) {
+        struct device *dev = LIST_NODE_ENTRY(node, struct device, list);
+        fn(dev, arg);
+    }
+}
+
 void device_model_dump(void)
 {
     printk("device model:\n");

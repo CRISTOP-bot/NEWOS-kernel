@@ -70,6 +70,12 @@ int  bus_register(struct bus *bus);
 
 void device_model_dump(void);
 
+/* Visit every registered device, in registration order. The callback runs
+ * synchronously with the device model's list stable; it must not register or
+ * unregister devices. Used by sysfs to build its PCI inventory. */
+typedef void (*device_visit_fn)(struct device *dev, void *arg);
+void device_model_for_each(device_visit_fn fn, void *arg);
+
 /* Match & binding helpers used by bus implementations (PCI, etc.). */
 int  driver_match_device(struct driver *drv, struct device *dev);
 int  device_bind(struct device *dev, struct driver *drv);

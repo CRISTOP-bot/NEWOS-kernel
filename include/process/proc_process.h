@@ -18,34 +18,6 @@ struct x64_iframe;
 /* Fixed base where anonymous SYS_MMAP regions start being handed out. */
 #define PROCESS_MMAP_BASE      0x10000000ull
 
-/* Socket states */
-#define SOCKET_CLOSED    0
-#define SOCKET_BOUND     1
-#define SOCKET_LISTEN    2
-#define SOCKET_CONNECTED 3
-#define SOCKET_ESTABLISHED 4
-
-/* Socket types */
-#define SOCK_STREAM      1
-#define SOCK_DGRAM       2
-#define SOCK_DGRAM       2
-
-/* Protocols */
-#define PROTO_TCP        6
-#define PROTO_UDP        17
-#define PROTO_ICMP       1
-
-/* Socket state per-FD */
-struct socket_state {
-    int fd;
-    int domain;
-    int type;
-    int protocol;
-    int proto;        /* internal: TCP/UDP/RAM */
-    int state;
-    u16 port;
-};
-
 #define PROCESS_EXIT_SIGNAL_BASE 128   /* Unix-style: 128 + signal */
 
 struct fd_entry {

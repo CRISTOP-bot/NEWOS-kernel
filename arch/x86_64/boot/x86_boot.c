@@ -14,6 +14,8 @@
 #include <fs/tmpfs.h>
 #include <fs/devfs.h>
 #include <fs/initramfs.h>
+#include <fs/procfs/procfs.h>
+#include <fs/sysfs/sysfs.h>
 #include <drivers/pit_timer.h>
 #include <drivers/serial_16550.h>
 #include <drivers/ps2.h>
@@ -51,6 +53,11 @@ void kernel_boot_tail(void)
     /* Device model. */
     device_model_init();
     pci_init();
+
+    /* Synthetic kernel trees: mount after the initramfs exists and, for
+     * sysfs, after PCI enumeration has populated the device model. */
+    procfs_init();
+    sysfs_init();
 
     /* System services: the PIT tick drives delays (and later the scheduler);
      * COM1 RX becomes interrupt-driven so the console can read input. */

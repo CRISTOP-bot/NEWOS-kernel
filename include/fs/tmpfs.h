@@ -9,4 +9,8 @@ void tmpfs_init(void);
 struct vfs_inode *tmpfs_create_node(struct vfs_inode *parent,
                                     const char *name, u32 mode);
 
+/* True for inodes backed by tmpfs. The VFS uses this to keep synthetic
+ * trees (devfs/procfs/sysfs) read-only with respect to unlink/rename. */
+int tmpfs_is_node(const struct vfs_inode *inode);
+
 #endif

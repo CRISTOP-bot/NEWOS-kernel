@@ -179,6 +179,10 @@ int vfs_unlink(const char *path)
     struct vfs_inode *in = find_child(parent, name);
     if (!in)
         return -1;
+    /* Synthetic trees (devfs/procfs/sysfs) are read-only. Only nodes owned
+     * by the VFS core (directories) or tmpfs (files) may be removed. */
+    if (in->ops != &default_ops && !tmpfs_is_node(in))
+        return -1;
     if ((in->mode & VFS_MODE_TYPE_MASK) == VFS_MODE_DIR &&
         !list_is_empty(&in->children))
         return -1;                     /* refuse non-empty directories */
@@ -225,6 +229,9 @@ int vfs_rename(const char *oldpath, const char *newpath)
 
     src = find_child(oparent, oname);
     if (!src)
+        return -1;
+    /* Keep synthetic device/kernel trees read-only. */
+    if (src->ops != &default_ops && !tmpfs_is_node(src))
         return -1;
     if (strlen(nname) >= sizeof(src->name))
         return -1;

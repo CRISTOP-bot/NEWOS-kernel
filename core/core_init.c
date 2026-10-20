@@ -108,6 +108,113 @@ static int ktest_vfs_tmpfs(void)
     return 0;
 }
 
+static int read_vfs_text(const char *path, char *buf, size_t size)
+{
+    struct vfs_file *f = vfs_open(path, VFS_O_READ);
+    if (!f)
+        return -1;
+
+    int n = vfs_read(f, buf, size - 1);
+    vfs_close(f);
+    if (n < 0)
+        return -1;
+    buf[n] = '\0';
+    return n;
+}
+
+static int ktest_procfs(void)
+{
+    char buf[512];
+    int n;
+
+    n = read_vfs_text("/proc/version", buf, sizeof(buf));
+    if (n <= 0 || strncmp(buf, "NEWOS ", 6) != 0 ||
+        !strstr(buf, NEWOS_VERSION))
+        return -1;
+
+    if (read_vfs_text("/proc/cmdline", buf, sizeof(buf)) < 0)
+        return -1;
+
+    n = read_vfs_text("/proc/uptime", buf, sizeof(buf));
+    if (n <= 0 || !strchr(buf, '.') || buf[0] < '0' || buf[0] > '9')
+        return -1;
+
+    n = read_vfs_text("/proc/meminfo", buf, sizeof(buf));
+    if (n <= 0 || !strstr(buf, "MemTotal:") || !strstr(buf, "MemFree:"))
+        return -1;
+
+    n = read_vfs_text("/proc/filesystems", buf, sizeof(buf));
+    if (n <= 0 || !strstr(buf, "proc"))
+        return -1;
+
+    n = read_vfs_text("/proc/mounts", buf, sizeof(buf));
+    if (n <= 0 || !strstr(buf, "/proc"))
+        return -1;
+
+    struct vfs_inode *proc = vfs_lookup("/proc");
+    char *names[16];
+    size_t count = 0;
+    if (!proc || vfs_readdir(proc, names, 16, &count) != 0 || count < 6)
+        return -1;
+
+    /* Synthetic trees are read-only; unlink must not tear them down. */
+    if (vfs_unlink("/proc/version") == 0)
+        return -1;
+
+    return 0;
+}
+
+static int ktest_sysfs(void)
+{
+    char buf[256];
+    int n;
+
+    n = read_vfs_text("/sys/kernel/ostype", buf, sizeof(buf));
+    if (n <= 0 || strcmp(buf, "NEWOS\n") != 0)
+        return -1;
+
+    n = read_vfs_text("/sys/kernel/osrelease", buf, sizeof(buf));
+    if (n <= 0 || strncmp(buf, NEWOS_VERSION, strlen(NEWOS_VERSION)) != 0)
+        return -1;
+
+    n = read_vfs_text("/sys/kernel/version", buf, sizeof(buf));
+    if (n <= 0 || strncmp(buf, "NEWOS ", 6) != 0)
+        return -1;
+
+    struct vfs_inode *sys = vfs_lookup("/sys");
+    struct vfs_inode *devices = vfs_lookup("/sys/bus/pci/devices");
+    char *names[16];
+    size_t count = 0;
+
+    if (!sys || !devices || !(devices->mode & VFS_MODE_DIR))
+        return -1;
+    if (vfs_readdir(sys, names, 16, &count) != 0 || count < 2)
+        return -1;
+
+    /* Every PCI function must expose the three read-only identity attrs. */
+    if (vfs_readdir(devices, names, 16, &count) != 0 || count == 0)
+        return -1;
+    static const char *const attrs[] = { "vendor", "device", "class" };
+    for (size_t i = 0; i < sizeof(attrs) / sizeof(attrs[0]); i++) {
+        char path[160];
+        if (strlen("/sys/bus/pci/devices/") + strlen(names[0]) +
+                strlen(attrs[i]) + 2 > sizeof(path))
+            return -1;
+        strcpy(path, "/sys/bus/pci/devices/");
+        strcat(path, names[0]);
+        strcat(path, "/");
+        strcat(path, attrs[i]);
+        n = read_vfs_text(path, buf, sizeof(buf));
+        if (n <= 0 || strncmp(buf, "0x", 2) != 0)
+            return -1;
+    }
+
+    if (vfs_unlink("/sys/kernel/ostype") == 0)
+        return -1;
+
+    return 0;
+}
+
 static int ktest_pipe(void)
 {
     struct ipc_pipe *pipe = ipc_pipe_new();
@@ -177,6 +284,8 @@ static const struct ktest ktests[] = {
     { "pmm-alloc", ktest_pmm_alloc_free },
     { "pipe",      ktest_pipe       },
     { "vfs-tmpfs", ktest_vfs_tmpfs  },
+    { "procfs",    ktest_procfs     },
+    { "sysfs",     ktest_sysfs      },
     { "pcnet",     pcnet_selftest   },
 };
 

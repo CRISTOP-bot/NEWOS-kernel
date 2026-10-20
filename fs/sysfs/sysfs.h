@@ -4,5 +4,6 @@
 #include <fs/vfs.h>
 
 struct vfs_inode *sysfs_mount(struct vfs_inode *parent);
+void sysfs_init(void);
 
 #endif

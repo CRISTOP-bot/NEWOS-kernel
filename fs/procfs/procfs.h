@@ -4,5 +4,6 @@
 #include <fs/vfs.h>
 
 struct vfs_inode *procfs_mount(struct vfs_inode *parent);
+void procfs_init(void);
 
 #endif

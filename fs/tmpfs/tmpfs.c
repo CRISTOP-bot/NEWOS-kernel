@@ -101,6 +101,11 @@ struct vfs_inode *tmpfs_create_node(struct vfs_inode *parent,
     return vfs_alloc_inode(parent, name, mode | 0644, &tmpfs_ops, NULL);
 }
 
+int tmpfs_is_node(const struct vfs_inode *inode)
+{
+    return inode && inode->ops == &tmpfs_ops;
+}
+
 void tmpfs_init(void)
 {
     pr_info("tmpfs: mounted\n");

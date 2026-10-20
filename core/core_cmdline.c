@@ -2,13 +2,22 @@
 #include <core/core_types.h>
 #include <iru_string.h>
 
+static char g_cmdline_buf[512];
 const char *g_boot_cmdline = "";
 
 void boot_capture_cmdline(const char *cmd)
 {
     if (!cmd)
         return;
-    g_boot_cmdline = cmd;
+
+    /* Boot-protocol strings live in loader-owned physical memory and can
+     * be reused by the PMM after early boot. Keep a kernel-owned copy so
+     * /proc/cmdline and the test-mode checks never dereference freed or
+     * recycled boot pages. */
+    size_t n = strnlen(cmd, sizeof(g_cmdline_buf) - 1);
+    memcpy(g_cmdline_buf, cmd, n);
+    g_cmdline_buf[n] = '\0';
+    g_boot_cmdline = g_cmdline_buf;
 }
 
 int boot_cmdline_has(const char *needle)
