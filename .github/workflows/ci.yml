@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  c-syntax:
+    name: Kernel self-test syntax
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Syntax-check the in-kernel self-tests
+        run: |
+          test -s core/core_selftest.c
+          gcc --version
+          gcc \
+            -ffreestanding \
+            -fno-builtin \
+            -fno-stack-protector \
+            -mno-red-zone \
+            -mno-sse \
+            -mno-mmx \
+            -mgeneral-regs-only \
+            -fsyntax-only \
+            -I. -Iinclude -Ilib/kernel -Iarch/x86_64/include \
+            core/core_selftest.c
