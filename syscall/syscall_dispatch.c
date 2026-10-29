@@ -570,8 +570,27 @@ long syscall_dispatch(struct x64_iframe *f)
         child->ppid = p->pid;
         memcpy(child->cwd, p->cwd, sizeof(child->cwd));
         if (nr == SYS_SPAWN3) {
-            fd_inherit(p, (int)f->r10, child, STDIN_FILENO);
-            fd_inherit(p, (int)f->r8, child, STDOUT_FILENO);
+            int stdin_fd = (int)f->r10;
+            int stdout_fd = (int)f->r8;
+            /* -1 explicitly keeps the child's default serial-console fd.
+             * Any other descriptor must exist and clone successfully; never
+             * silently claim redirection succeeded when it did not. */
+            if (stdin_fd < -1 || stdin_fd >= PROCESS_MAX_FDS ||
+                stdout_fd < -1 || stdout_fd >= PROCESS_MAX_FDS ||
+                (stdin_fd >= 0 &&
+                 (stdin_fd >= PROCESS_MAX_FDS || !p->fds[stdin_fd].file)) ||
+                (stdout_fd >= 0 &&
+                 (stdout_fd >= PROCESS_MAX_FDS || !p->fds[stdout_fd].file))) {
+                process_free(child);
+                break;
+            }
+            if ((stdin_fd >= 0 &&
+                 fd_inherit(p, stdin_fd, child, STDIN_FILENO) != 0) ||
+                (stdout_fd >= 0 &&
+                 fd_inherit(p, stdout_fd, child, STDOUT_FILENO) != 0)) {
+                process_free(child);
+                break;
+            }
         }
         sched_add_process(child);
         ret = (long)child->pid;
