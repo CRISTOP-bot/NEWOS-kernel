@@ -291,6 +291,60 @@ static int ktest2_syscall(void)
     f.rdx = 13;
     if (syscall_dispatch(&f) != 13)
         goto fail_back;
+
+    /* WAITPID may reap only a child owned by the current process. First
+     * prove that a foreign zombie is rejected and remains available to its
+     * actual parent; then prove that this process can wait for its own child
+     * and receives the Linux-layout exit status promised by the ABI. */
+    struct process *child = process_create_from_vfs("/bin/hello", "wait-child");
+    if (!child)
+        goto fail_back;
+    pid_t child_pid = child->pid;
+    child->ppid = p->pid + 1000; /* a different parent */
+    sched_add_process(child);
+    child->exit_code = 23;
+    child->state = PROCESS_STATE_EXITED;
+    sched_remove_runnable(child);
+    if (sched_zombify(child) != 0) {
+        process_free(child);
+        goto fail_back;
+    }
+    f.rax = SYS_WAITPID;
+    f.rdi = (u64)child_pid;
+    f.rsi = va;
+    if (syscall_dispatch(&f) != SYSCALL_RET_ERROR ||
+        sched_zombie_find(child_pid) != child)
+        goto fail_back;
+    sched_zombie_reclaim(child);
+
+    child = process_create_from_vfs("/bin/hello", "wait-child");
+    if (!child)
+        goto fail_back;
+    child_pid = child->pid;
+    child->ppid = p->pid;
+    sched_add_process(child);
+    child->exit_code = 23;
+    child->state = PROCESS_STATE_EXITED;
+    sched_remove_runnable(child);
+    if (sched_zombify(child) != 0) {
+        process_free(child);
+        goto fail_back;
+    }
+    memset((void *)up, 0, sizeof(int));
+    f.rax = SYS_WAITPID;
+    f.rdi = (u64)child_pid;
+    f.rsi = va;
+    if (syscall_dispatch(&f) != (long)child_pid)
+        goto fail_back;
+    {
+        int status = 0;
+        if (copy_from_user(&status, (const void *)va, sizeof(status)) != 0 ||
+            status != (23 << 8))
+            goto fail_back;
+    }
+    if (sched_zombie_find(child_pid) != NULL)
+        goto fail_back;
+
     if (vmm_switch_to(vmm_kernel_space()) != 0)
         goto fail;
 

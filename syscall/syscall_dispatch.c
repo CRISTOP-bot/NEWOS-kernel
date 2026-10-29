@@ -584,6 +584,14 @@ long syscall_dispatch(struct x64_iframe *f)
         pid_t want = (pid_t)f->rdi;
 
         while (1) {
+            /* waitpid is a parent operation. A process must not be able to
+             * collect another process's zombie merely by guessing its PID.
+             * Spawn sets ppid before making the child runnable; reject unknown,
+             * reaped, and non-child PIDs before examining the zombie queue. */
+            struct process *target = sched_find_process(want);
+            if (!target || target->ppid != p->pid)
+                break;
+
             struct process *z = sched_zombie_find(want);
             if (z) {
                 int code = z->exit_code;
