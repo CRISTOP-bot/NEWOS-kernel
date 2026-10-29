@@ -1,9 +1,16 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/fs/devfs/devfs.c
+ * Description: devfs: device file system. Each entry is an inode whose read/write calls
+ * Added: 2026-10-17
+ */
 #include <fs/vfs.h>
 #include <mm/mm_heap.h>
 #include <core/core_printk.h>
 #include <drivers/serial_16550.h>
 #include <drivers/tty_console.h>
 #include <drivers/ps2.h>
+#include <drivers/ata.h>
 #include <iru_string.h>
 
 /* devfs: device file system. Each entry is an inode whose read/write calls
@@ -14,6 +21,7 @@ struct devfs_device {
     int (*read)(struct vfs_file *f, void *buf, size_t len, size_t *got);
     int (*write)(struct vfs_file *f, const void *buf, size_t len,
                  size_t *wrote);
+    u32 mode_override;     /* 0 = character device (default) */
 };
 
 static int devfs_read(struct vfs_file *f, void *buf, size_t len, size_t *got)
@@ -183,6 +191,97 @@ static struct devfs_device dev_serial = {
     .write = serial_write_dev,
 };
 
+/* /dev/disk0: raw primary-master ATA disk (see drivers/block/ata.c).
+ * Position comes from f->offset (vfs_core advances it), so reads and
+ * writes form a byte-oriented, seekable stream over the sectors. The
+ * head and tail of a transfer may straddle sector boundaries; partial
+ * sectors go through a 512-byte scratch buffer, writes with a
+ * read-modify-write so userland never sees torn partial sectors.
+ *
+ * EOF is not an error: reads past the end return +got = 0 like regular
+ * files, writes past the end are refused (-1) by the caller below.
+ * Hardware failures during the loop report -1 with the bytes that did
+ * land before them. */
+static int disk_rw(struct vfs_file *f, void *buf, size_t len, size_t *ret,
+                   int write)
+{
+    block_dev_t *d = ata_get_dev();
+    u8 *base = buf;
+    u64 pos = f->offset;
+    size_t left = len, done = 0;
+    int rc = 0;
+
+    u8 sec[512];
+    while (left > 0 && d) {
+        u64 dev_bytes = d->sector_count * (u64)d->sector_size;
+        if (pos >= dev_bytes)
+            break;
+        u64 lba = pos / d->sector_size;
+        u32 off = (u32)(pos % d->sector_size);
+        u32 chunk = d->sector_size - off;
+        if ((u64)chunk > left)
+            chunk = (u32)left;
+
+        if (off == 0 && chunk == d->sector_size) {
+            if (write) {
+                if (block_dev_write(d, lba, 1, base + done) != 0)
+                    rc = -1;
+            } else {
+                if (block_dev_read(d, lba, 1, base + done) != 0)
+                    rc = -1;
+            }
+        } else {
+            if (block_dev_read(d, lba, 1, sec) != 0)
+                rc = -1;
+            else if (write) {
+                memcpy(sec + off, base + done, chunk);
+                if (block_dev_write(d, lba, 1, sec) != 0)
+                    rc = -1;
+            } else {
+                memcpy(base + done, sec + off, chunk);
+            }
+        }
+
+        if (rc != 0)
+            break;
+        done += chunk;
+        pos += chunk;
+        left -= chunk;
+    }
+
+    *ret = done;
+    return rc;
+}
+
+static int disk_read_dev(struct vfs_file *f, void *buf, size_t len,
+                         size_t *got)
+{
+    return disk_rw(f, buf, len, got, 0);
+}
+
+static int disk_write_dev(struct vfs_file *f, const void *buf, size_t len,
+                          size_t *wrote)
+{
+    block_dev_t *d = ata_get_dev();
+    if (!d)
+        return -1;
+    u64 dev_bytes = d->sector_count * (u64)d->sector_size;
+    if (f->offset >= dev_bytes || len > dev_bytes - f->offset)
+        return -1;                     /* refuse writes past the end */
+
+    size_t n = 0;
+    if (disk_rw(f, (void *)buf, len, &n, 1) != 0)
+        return -1;
+    *wrote = n;
+    return 0;
+}
+
+static struct devfs_device dev_disk0 = {
+    .name = "disk0",
+    .read  = disk_read_dev,
+    .write = disk_write_dev,
+};
+
 int devfs_is_serial(const struct vfs_file *f)
 {
     return f && f->inode && f->inode->ops == &devfs_ops &&
@@ -194,7 +293,9 @@ static void devfs_register(struct devfs_device *dev)
     struct vfs_inode *devdir = vfs_lookup("/dev");
     if (!devdir)
         return;
-    vfs_alloc_inode(devdir, dev->name, VFS_MODE_CHAR | 0644,
+    vfs_alloc_inode(devdir, dev->name,
+                    dev->mode_override ? dev->mode_override
+                                       : (VFS_MODE_CHAR | 0644),
                     &devfs_ops, dev);
 }
 
@@ -206,5 +307,11 @@ void devfs_init(void)
     devfs_register(&dev_serial);
     devfs_register(&dev_console);
     devfs_register(&dev_mouse);
-    pr_info("devfs: mounted /dev (null, zero, serial, console, mouse)\n");
+    int has_disk = ata_get_dev() != NULL;
+    if (has_disk) {
+        dev_disk0.mode_override = VFS_MODE_BLOCK | 0644;
+        devfs_register(&dev_disk0);
+    }
+    pr_info("devfs: mounted /dev (null, zero, serial, console, mouse%s)\n",
+            has_disk ? ", disk0" : "");
 }

@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/include/process/sched.h
+ * Description: Handoff slot owned by the arch interrupt epilogue. The scheduler writes
+ * Added: 2026-10-17
+ */
 #ifndef KERNEL_SCHED_H
 #define KERNEL_SCHED_H
 

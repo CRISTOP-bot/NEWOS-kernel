@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/include/fs/vfs.h
+ * Description: Virtual File System.
+ * Added: 2026-10-17
+ */
 #ifndef KERNEL_VFS_H
 #define KERNEL_VFS_H
 
@@ -33,6 +39,13 @@ struct inode_ops {
                    size_t *got);
     int (*truncate)(struct vfs_inode *inode, size_t size);
     void (*destroy)(struct vfs_inode *inode);   /* free fs-private data */
+    /* Disk-backed directory backends (FAT32): materialize a child under a
+     * directory that is authoritative on the device rather than in the
+     * VFS children list. NULL for in-memory filesystems (tmpfs/default).
+     * The returned inode carries `mode` plus the fs private data. */
+    struct vfs_inode *(*create)(struct vfs_inode *parent, const char *name,
+                                u32 mode);
+    int (*mkdir)(struct vfs_inode *parent, const char *name);
 };
 
 struct vfs_inode {

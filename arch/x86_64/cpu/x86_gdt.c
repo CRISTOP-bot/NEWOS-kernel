@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/arch/x86_64/cpu/x86_gdt.c
+ * Description: 64-bit TSS / system descriptor, byte-accurate Intel layout:
+ * Added: 2026-10-17
+ */
 #include <x86_gdt.h>
 #include <x86_cpu.h>
 #include <core/core_types.h>
@@ -46,6 +52,10 @@ struct tss {
 static u8 g_gdt_bytes[8 * 8];
 static struct tss g_tss;
 static struct { u16 limit; u64 base; } __attribute__((packed)) g_gdt_ptr;
+
+/* TSS.RSP0 mirror read by the SYSCALL entry stub before it has a kernel
+ * stack.  Kept in sync with every TSS update (install + scheduler handoff). */
+u64 g_syscall_kernel_rsp;
 
 static inline u64 gdt_read(int index)
 {
@@ -96,6 +106,7 @@ void x64_gdt_reload(void)
 int x64_tss_install(u64 rsp0)
 {
     g_tss.rsp0 = rsp0;
+    g_syscall_kernel_rsp = rsp0;
     tss_setup(&g_tss,
               (struct gdt_entry_tss *)(g_gdt_bytes + GDT_TSS));
 
@@ -156,4 +167,5 @@ u64 x64_current_kernel_stack(void)
 void x64_tss_set_rsp0(u64 rsp0)
 {
     g_tss.rsp0 = rsp0;
+    g_syscall_kernel_rsp = rsp0;
 }

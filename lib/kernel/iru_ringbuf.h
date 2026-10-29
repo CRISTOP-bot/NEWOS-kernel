@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/lib/kernel/iru_ringbuf.h
+ * Description: power of two
+ * Added: 2026-10-17
+ */
 #ifndef LIBK_RINGBUF_H
 #define LIBK_RINGBUF_H
 

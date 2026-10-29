@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/drivers/block_dev.c
+ * Description: NEWOS drivers module
+ * Added: 2026-10-17
+ */
 #include <drivers/block_dev.h>
 #include <mm/mm_heap.h>
 

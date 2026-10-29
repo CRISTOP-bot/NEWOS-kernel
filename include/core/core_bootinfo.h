@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/include/core/core_bootinfo.h
+ * Description: QEMU PVH (x86_load_pvh) calling convention.
+ * Added: 2026-10-17
+ */
 #ifndef NEWOS_KERNEL_BOOTINFO_H
 #define NEWOS_KERNEL_BOOTINFO_H
 

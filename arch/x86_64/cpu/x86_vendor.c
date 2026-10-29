@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/arch/x86_64/cpu/x86_vendor.c
+ * Description: Standard features: leaf 1.
+ * Added: 2026-10-17
+ */
 #include <x86_vendor.h>
 #include <x86_cpu.h>
 #include <core/core_printk.h>

@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/process/elf_loader.c
+ * Description: ELF64 loader.
+ * Added: 2026-10-17
+ */
 #include <process/proc_elf.h>
 #include <core/core.h>
 #include <mm/mm_pmm.h>
@@ -9,7 +15,23 @@
  * Static ET_EXEC images only (no shared objects, no dynamic relocations).
  * The kernel scans the program headers, loads each PT_LOAD segment into
  * freshly allocated frames, zero-fills the BSS tail (memsz > filesz) and
- * maps the pages with the permissions derived from p_flags. */
+ * maps the pages with the permissions derived from p_flags.
+ *
+ * Supported profile (see docs/abi.md "ELF64 loader profile"): ET_EXEC +
+ * ELFCLASS64 + little-endian x86_64, PT_LOAD program headers only. Dynamic
+ * objects (ET_DYN) and PT_INTERP binaries are rejected with an explicit
+ * reason — NEWOS has no dynamic loader, so silently loading them would only
+ * fault later inside the process. PT_TLS is detected and kept loadable with
+ * a warning: static musl binaries set their own FS-based TCB via
+ * SYS_ARCH_PRCTL, so ignoring the header is safe there, but the message
+ * makes the policy visible instead of a silent no-op. */
+
+static void elf_reject(const char *what, const struct elf64_ehdr *eh,
+                       const char *reason)
+{
+    printk("proc: ELF64 reject (%s e_type=%u): %s\n",
+           what, (unsigned)eh->e_type, reason);
+}
 
 int elf_validate(struct elf_image *img)
 {
@@ -20,22 +42,52 @@ int elf_validate(struct elf_image *img)
 
     if (eh->e_ident[0] != 0x7f || eh->e_ident[1] != 'E' ||
         eh->e_ident[2] != 'L' || eh->e_ident[3] != 'F')
-        return -1;
-    if (eh->e_ident[4] != ELFCLASS64)
-        return -1;
-    if (eh->e_ident[5] != ELFDATA2LSB)
-        return -1;
-    if (eh->e_type != ET_EXEC)
+        return -1;                     /* not ELF: stay silent, common error */
+    if (eh->e_ident[4] != ELFCLASS64 || eh->e_ident[5] != ELFDATA2LSB)
+        return -1;                     /* ELF but the wrong class/endianness */
+    if (eh->e_version != EV_CURRENT)
         return -1;
     if (eh->e_machine != EM_X86_64)
         return -1;
-    if (eh->e_version != EV_CURRENT)
+    if (eh->e_type != ET_EXEC) {
+        elf_reject("not ET_EXEC", eh,
+                   eh->e_type == ET_DYN
+                       ? "dynamic/PIE shared objects unsupported - "
+                         "static ET_EXEC only"
+                       : "unsupported ELF object type - static ET_EXEC only");
         return -1;
+    }
     if (eh->e_phentsize != sizeof(struct elf64_phdr) || eh->e_phnum == 0)
         return -1;
     if (eh->e_phoff == 0 || eh->e_phoff + (u64)eh->e_phnum * eh->e_phentsize >
         img->size)
         return -1;
+
+    /* Program-header audit before anything is mapped: PT_INTERP means the
+     * image wants a dynamic loader NEWOS does not have (hard reject, we
+     * would only crash later inside the process); PT_TLS can be serviced by
+     * the program itself (static musl uses SYS_ARCH_PRCTL), so it loads
+     * with a visible warning instead of silent magic. */
+    int has_interp = 0, has_tls = 0;
+    for (unsigned i = 0; i < eh->e_phnum; i++) {
+        const struct elf64_phdr *ph = (const struct elf64_phdr *)
+            (img->data + eh->e_phoff + (size_t)i * eh->e_phentsize);
+        if (ph->p_type == PT_INTERP) {
+            has_interp = 1;
+        } else if (ph->p_type == PT_TLS) {
+            has_tls = 1;
+        }
+    }
+    /* PT_INTERP/PT_TLS detection uses only the stable ELF PT_* numbering,
+     * no format assumptions beyond the phdr contract checked above. */
+    if (has_interp) {
+        elf_reject("PT_INTERP", eh,
+                   "dynamically linked image - NEWOS has no dynamic loader");
+        return -1;
+    }
+    if (has_tls)
+        printk("proc: ELF64 has PT_TLS - loader ignores it, the program "
+               "must set its own FS base via SYS_ARCH_PRCTL\n");
 
     img->entry = eh->e_entry;
     img->load_start = ~0ull;

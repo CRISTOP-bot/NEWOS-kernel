@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/arch/x86_64/cpu/x86_cpuid.c
+ * Description: highest basic leaf
+ * Added: 2026-10-17
+ */
 #include <x86_cpu.h>
 #include <core/core_printk.h>
 #include <iru_string.h>

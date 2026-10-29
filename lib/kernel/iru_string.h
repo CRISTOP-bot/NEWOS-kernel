@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/lib/kernel/iru_string.h
+ * Description: NEWOS library interface
+ * Added: 2026-10-17
+ */
 #ifndef LIBK_STRING_H
 #define LIBK_STRING_H
 

@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/include/drivers/tty_console.h
+ * Description: Console output abstraction. The kernel console multiplexes to any
+ * Added: 2026-10-17
+ */
 #ifndef DRIVERS_CONSOLE_H
 #define DRIVERS_CONSOLE_H
 

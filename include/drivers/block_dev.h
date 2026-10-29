@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/include/drivers/block_dev.h
+ * Description: NEWOS headers interface
+ * Added: 2026-10-17
+ */
 #ifndef BLOCK_DEV_H
 #define BLOCK_DEV_H
 

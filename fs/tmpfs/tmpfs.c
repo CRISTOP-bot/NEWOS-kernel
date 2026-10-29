@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/fs/tmpfs/tmpfs.c
+ * Description: tmpfs: an in-memory file system backed by the kernel heap.
+ * Added: 2026-10-17
+ */
 #include <fs/vfs.h>
 #include <mm/mm_heap.h>
 #include <core/core.h>

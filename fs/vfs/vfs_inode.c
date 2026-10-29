@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/fs/vfs/vfs_inode.c
+ * Description: Inode allocation and lifecycle. All inodes are owned by the VFS core;
+ * Added: 2026-10-17
+ */
 #include <fs/vfs.h>
 #include <mm/mm_heap.h>
 #include <core/core_printk.h>

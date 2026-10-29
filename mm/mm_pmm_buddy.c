@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/mm/mm_pmm_buddy.c
+ * Description: Buddy allocator for larger contiguous blocks.
+ * Added: 2026-10-17
+ */
 #include <mm/mm_pmm.h>
 #include <core/core_printk.h>
 #include <iru_string.h>

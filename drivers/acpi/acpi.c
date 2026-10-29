@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/drivers/acpi/acpi.c
+ * Description: NEWOS drivers module
+ * Added: 2026-10-17
+ */
 #include <drivers/acpi.h>
 #include <core/core_printk.h>
 #include <lib/kernel/iru_string.h>

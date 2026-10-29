@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/core/core_printk.c
+ * Description: NEWOS kernel core module
+ * Added: 2026-10-17
+ */
 #include <core/core_printk.h>
 #include <core/core_types.h>
 #include <iru_format.h>

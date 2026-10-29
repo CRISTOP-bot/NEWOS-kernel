@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/mm/mm_usercopy.c
+ * Description: User pointer validation and copying.
+ * Added: 2026-10-17
+ */
 #include <mm/mm_usercopy.h>
 #include <mm/mm_vmm.h>
 #include <core/core.h>

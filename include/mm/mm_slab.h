@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/include/mm/mm_slab.h
+ * Description: NEWOS headers interface
+ * Added: 2026-10-17
+ */
 #ifndef MM_SLAB_H
 #define MM_SLAB_H
 

@@ -1,6 +1,14 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/drivers/pci/pci_bus.c
+ * Description: PCI bus driver: config-space access over the legacy 0xCF8/0xCFC ports,
+ * Added: 2026-10-17
+ */
 #include <drivers/pci.h>
 #include <drivers/drv_core.h>
 #include <drivers/pcnet.h>
+#include <drivers/e1000.h>
+#include <drivers/hda.h>
 #include <mm/mm_heap.h>
 #include <core/core_printk.h>
 #include <iru_string.h>
@@ -201,6 +209,8 @@ void pci_init(void)
     bus_register(&g_pci_bus);
     pci_chipset_driver_register();
     pcnet_driver_register();
+    e1000_driver_register();
+    hda_driver_register();
 
     unsigned n = pci_bus_scan();
     pr_info("PCI: %u function(s) found\n", n);

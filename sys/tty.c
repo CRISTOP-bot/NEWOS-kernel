@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/sys/tty.c
+ * Description: NEWOS system module
+ * Added: 2026-10-17
+ */
 #include <sys/tty.h>
 #include <lib/kernel/iru_lock.h>
 #include <core/core_printk.h>

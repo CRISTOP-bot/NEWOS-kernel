@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/include/mm/mm_usercopy.h
+ * Description: User <-> kernel memory transfer.
+ * Added: 2026-10-17
+ */
 #ifndef KERNEL_USERCOPY_H
 #define KERNEL_USERCOPY_H
 

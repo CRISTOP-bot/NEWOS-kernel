@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/lib/kernel/iru_string.c
+ * Description: NEWOS library module
+ * Added: 2026-10-17
+ */
 #include <iru_string.h>
 
 size_t strlen(const char *s)

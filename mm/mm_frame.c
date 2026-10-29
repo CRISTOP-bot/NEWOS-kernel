@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/mm/mm_frame.c
+ * Description: Physical frame API.
+ * Added: 2026-10-17
+ */
 #include <mm/mm_pmm.h>
 #include <core/core.h>
 

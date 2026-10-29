@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/include/sys/wait_queue.h
+ * Description: NEWOS headers interface
+ * Added: 2026-10-17
+ */
 #ifndef WAIT_QUEUE_H
 #define WAIT_QUEUE_H
 

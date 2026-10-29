@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/arch/x86_64/include/x86_fpu.h
+ * Description: x87 / SSE state handling.
+ * Added: 2026-10-17
+ */
 #ifndef ARCH_X86_64_FPU_H
 #define ARCH_X86_64_FPU_H
 

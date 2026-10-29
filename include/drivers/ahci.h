@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/include/drivers/ahci.h
+ * Description: NEWOS headers interface
+ * Added: 2026-10-17
+ */
 #ifndef AHCI_H
 #define AHCI_H
 

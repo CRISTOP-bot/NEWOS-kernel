@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/lib/kernel/iru_bitmap.c
+ * Description: Scan the first (possibly partial) word.
+ * Added: 2026-10-17
+ */
 #include <iru_bitmap.h>
 
 size_t bitmap_find_first_bit(const size_t *map, size_t bits, size_t start)

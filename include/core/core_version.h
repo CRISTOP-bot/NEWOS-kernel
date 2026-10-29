@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/include/core/core_version.h
+ * Description: NEWOS release identity.
+ * Added: 2026-10-20
+ */
 /* NEWOS release identity.
  *
  * The build passes NEWOS_VERSION / NEWOS_VERSION_ID from the repository's

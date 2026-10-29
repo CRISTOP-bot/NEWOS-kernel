@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/include/core/core_panic.h
+ * Description: NEWOS headers interface
+ * Added: 2026-10-17
+ */
 #ifndef KERNEL_PANIC_H
 #define KERNEL_PANIC_H
 

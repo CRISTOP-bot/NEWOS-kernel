@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/lib/kernel/iru_format.c
+ * Description: Emits an unsigned magnitude with sign/padding rules.
+ * Added: 2026-10-17
+ */
 #include <iru_format.h>
 
 struct buf_sink {

@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/arch/x86_64/boot/limine.c
+ * Description: Limine boot protocol entry point.
+ * Added: 2026-10-17
+ */
 #include <abi/limine.h>
 #include <core/core.h>
 #include <core/core_bootinfo.h>

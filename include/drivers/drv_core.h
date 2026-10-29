@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/include/drivers/drv_core.h
+ * Description: Generic device model.
+ * Added: 2026-10-17
+ */
 #ifndef KERNEL_DRIVER_H
 #define KERNEL_DRIVER_H
 

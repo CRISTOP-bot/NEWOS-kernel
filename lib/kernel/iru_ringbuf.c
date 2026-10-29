@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/lib/kernel/iru_ringbuf.c
+ * Description: NEWOS library module
+ * Added: 2026-10-17
+ */
 #include <iru_ringbuf.h>
 
 void ringbuf_init(struct ringbuf *rb, void *data, size_t size)

@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/include/drivers/acpi.h
+ * Description: NEWOS headers interface
+ * Added: 2026-10-17
+ */
 #ifndef ACPI_H
 #define ACPI_H
 

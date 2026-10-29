@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/include/drivers/pci.h
+ * Description: Bus driver for the PCI hierarchy (config-space access + enumeration + the
+ * Added: 2026-10-17
+ */
 #ifndef DRIVER_PCI_H
 #define DRIVER_PCI_H
 

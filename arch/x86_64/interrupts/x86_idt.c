@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/arch/x86_64/interrupts/x86_idt.c
+ * Description: int $0x80 syscall gate
+ * Added: 2026-10-17
+ */
 #include <x86_idt.h>
 #include <x86_cpu.h>
 #include <x86_gdt.h>

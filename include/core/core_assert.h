@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/include/core/core_assert.h
+ * Description: NEWOS headers interface
+ * Added: 2026-10-17
+ */
 #ifndef KERNEL_ASSERT_H
 #define KERNEL_ASSERT_H
 

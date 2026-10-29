@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/drivers/pci/pci_chipset.c
+ * Description: Chipset front-end driver. Binds (by vendor/device ID, not name) the
+ * Added: 2026-10-17
+ */
 #include <drivers/pci.h>
 #include <drivers/drv_core.h>
 #include <core/core_printk.h>

@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/fs/initramfs/initramfs.c
+ * Description: initramfs: the boot-time root filesystem. In this phase the kernel
+ * Added: 2026-10-17
+ */
 #include <fs/vfs.h>
 #include <core/core_printk.h>
 #include <core/core_version.h>
@@ -37,11 +43,9 @@ DECL_BIN(cat)
 DECL_BIN(echo)
 DECL_BIN(img)
 DECL_BIN(vid)
-DECL_BIN(ltest)
 DECL_BIN(about)
 DECL_BIN(newfetch)
 DECL_BIN(desktop)
-DECL_BIN(kilo)
 DECL_BIN(mkdir)
 DECL_BIN(rmdir)
 DECL_BIN(rm)
@@ -66,24 +70,46 @@ DECL_BIN(grep)
 DECL_BIN(find)
 DECL_BIN(sort)
 DECL_BIN(newpkg)
+DECL_BIN(frotz)
+DECL_BIN(busybox)
+DECL_BIN(glxgears)
 
-/* nano is a command-name alias of the Kilo editor binary. */
-extern const u8 _binary_nano_elf_start[];
-extern const u8 _binary_nano_elf_end[];
+/* Host-built static Linux/musl programs from the vendored ports. Both run
+ * through the Linux-compatible SYSCALL entry (see ports/tcc and ports/nano). */
+DECL_BIN(nano)
+DECL_BIN(tcc)
+
+/* VOXEL classic desktop (MIT, ports/voxel): NEWOS-native ELF built from
+ * source by scripts/build-voxel.sh. */
+DECL_BIN(voxel)
 
 /* Host-built GNU tools, packed by scripts/pack-gnu.sh into one `.new`
  * archive and staged at /tmp for the shell's startup install. */
 extern const u8 _binary_gnu_coreutils_new_start[];
 extern const u8 _binary_gnu_coreutils_new_end[];
 
+/* NEWOS C SDK (headers + libc.a + crt0.o) for the on-board tcc; staged at
+ * /tmp and installed with `newpkg install /tmp/newos-sdk.new`. */
+extern const u8 _binary_newos_sdk_new_start[];
+extern const u8 _binary_newos_sdk_new_end[];
+
 /* Sample `.new` package embedded by the build (tools/newpkg): staged as
  * `sample.new` -> _binary_sample_new_{start,end}. */
 extern const u8 _binary_sample_new_start[];
 extern const u8 _binary_sample_new_end[];
 
+/* Demo Z-code story for /bin/frotz: tools/frotz/tests/mini.z3 ->
+ * _binary_mini_z3_{start,end}, installed at /usr/share/zcode/mini.z3. */
+extern const u8 _binary_mini_z3_start[];
+extern const u8 _binary_mini_z3_end[];
+
 /* Shell boot script: user/rootfs/nsh.rc -> _binary_nsh_rc_{start,end}. */
 extern const u8 _binary_nsh_rc_start[];
 extern const u8 _binary_nsh_rc_end[];
+
+/* System nano configuration: user/rootfs/nanorc -> /usr/etc/nanorc. */
+extern const u8 _binary_nanorc_start[];
+extern const u8 _binary_nanorc_end[];
 
 static const struct {
     const char *name;
@@ -96,11 +122,9 @@ static const struct {
     BIN(echo)
     BIN(img)
     BIN(vid)
-    BIN(ltest)
     BIN(about)
     BIN(newfetch)
     BIN(desktop)
-    BIN(kilo)
     BIN(mkdir)
     BIN(rmdir)
     BIN(rm)
@@ -125,7 +149,12 @@ static const struct {
     BIN(find)
     BIN(sort)
     BIN(newpkg)
-    { "nano", _binary_nano_elf_start, _binary_nano_elf_end },
+    BIN(frotz)
+    BIN(busybox)
+    BIN(glxgears)
+    BIN(nano)
+    BIN(tcc)
+    BIN(voxel)
 };
 
 static void install_blob(const char *path, const u8 *data, size_t len,
@@ -155,9 +184,10 @@ void initramfs_init(void)
      * first because this VFS intentionally does not synthesize missing ones. */
     static const char *system_dirs[] = {
         "/usr/bin", "/usr/sbin", "/usr/lib", "/usr/lib64", "/usr/include",
+        "/usr/etc",
         "/usr/share", "/usr/share/doc", "/usr/share/doc/newos",
         "/usr/share/man", "/usr/share/misc", "/usr/share/licenses",
-        "/usr/src", "/usr/local",
+        "/usr/share/zcode", "/usr/src", "/usr/local",
         "/usr/local/bin", "/usr/local/sbin", "/usr/local/lib",
         "/usr/local/share", "/usr/local/etc", "/etc/skel", "/etc/init.d",
         "/etc/opt", "/run/lock", "/var/cache", "/var/cache/newpkg",
@@ -214,6 +244,46 @@ void initramfs_init(void)
         "This is root's home. Be careful, you are the superuser.\n";
     static const char user_readme[] =
         "Welcome home. Try: ls /bin -- cat /etc/motd -- help\n";
+    /* Canonical copy: ports/tcc/demo/hello.c (keep the two in sync). */
+    static const char tcc_demo[] =
+        "/*\n"
+        " * NEWOS tcc demo: a freestanding C program with no headers at all.\n"
+        " *\n"
+        " * The image installs this file as /etc/tcc-hello.c. TinyCC compiles and runs\n"
+        " * it in place (no fork/exec: tcc -run relocates the code into this process\n"
+        " * and calls main):\n"
+        " *\n"
+        " *     tcc -nostdlib -run /etc/tcc-hello.c\n"
+        " *\n"
+        " * The int $0x80 calls below are the native NEWOS ABI (rax = number,\n"
+        " * rdi/rsi/rdx = arguments), not Linux's syscall instruction.\n"
+        " */\n"
+        "static long newos_syscall3(long nr, long a, long b, long c)\n"
+        "{\n"
+        "    long ret;\n"
+        "\n"
+        "    __asm__ volatile(\"int $0x80\"\n"
+        "                     : \"=a\"(ret)\n"
+        "                     : \"a\"(nr), \"D\"(a), \"S\"(b), \"d\"(c)\n"
+        "                     : \"rcx\", \"r11\", \"memory\");\n"
+        "    return ret;\n"
+        "}\n"
+        "\n"
+        "static unsigned long text_len(const char *s)\n"
+        "{\n"
+        "    unsigned long n = 0;\n"
+        "    while (s[n])\n"
+        "        n++;\n"
+        "    return n;\n"
+        "}\n"
+        "\n"
+        "int main(void)\n"
+        "{\n"
+        "    const char msg[] = \"Hello from tcc on NEWOS!\\n\";\n"
+        "\n"
+        "    newos_syscall3(1, 1, (long)msg, (long)text_len(msg));  /* SYS_WRITE */\n"
+        "    return 0;\n"
+        "}\n";
 
     struct write_req {
         const char *path;
@@ -233,6 +303,7 @@ void initramfs_init(void)
         { "/root/.profile", profile },
         { "/root/README", root_readme },
         { "/home/user/README", user_readme },
+        { "/etc/tcc-hello.c", tcc_demo },
     };
     for (size_t i = 0; i < sizeof(dotfiles) / sizeof(dotfiles[0]); i++) {
         if (vfs_create(dotfiles[i].path) != 0)
@@ -269,6 +340,10 @@ void initramfs_init(void)
               _binary_test_ppm_end },
             { "/etc/nsh.rc", _binary_nsh_rc_start,
               _binary_nsh_rc_end },
+            { "/usr/etc/nanorc", _binary_nanorc_start,
+              _binary_nanorc_end },
+            { "/usr/share/zcode/mini.z3", _binary_mini_z3_start,
+              _binary_mini_z3_end },
         };
         for (size_t i = 0; i < sizeof(files) / sizeof(files[0]); i++) {
             size_t len = (size_t)(files[i].end - files[i].start);
@@ -333,8 +408,10 @@ void initramfs_init(void)
      *   newpkg verify /tmp/hello-new-1.0.0-x86_64.new
      *   newpkg install /tmp/hello-new-1.0.0-x86_64.new
      *   newpkg install /tmp/gnu-coreutils.new
+     *   newpkg install /tmp/newos-sdk.new   (C SDK for /bin/tcc)
      * The first is built deterministically by tools/newpkg/newpkg-build.py,
-     * the second by scripts/pack-gnu.sh (`make gnu && make gnu-pkg`). */
+     * the second by scripts/pack-gnu.sh (`make gnu && make gnu-pkg`), the
+     * third by scripts/pack-sdk.sh from the generated sysroot. */
     {
         struct {
             const char *path;
@@ -346,6 +423,9 @@ void initramfs_init(void)
             { "/tmp/gnu-coreutils.new",
               _binary_gnu_coreutils_new_start,
               _binary_gnu_coreutils_new_end },
+            { "/tmp/newos-sdk.new",
+              _binary_newos_sdk_new_start,
+              _binary_newos_sdk_new_end },
         };
         for (size_t i = 0; i < sizeof(pkgs) / sizeof(pkgs[0]); i++) {
             size_t len = (size_t)(pkgs[i].end - pkgs[i].start);

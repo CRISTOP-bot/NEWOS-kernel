@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/core/core_cmdline.c
+ * Description: Boot-protocol strings live in loader-owned physical memory and can
+ * Added: 2026-10-17
+ */
 #include <core/core_bootinfo.h>
 #include <core/core_types.h>
 #include <iru_string.h>

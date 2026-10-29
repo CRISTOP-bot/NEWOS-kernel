@@ -1,4 +1,11 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/drivers/net/pcnet.c
+ * Description: AMD PCnet-PCI II (Am79C970A) Ethernet driver.
+ * Added: 2026-10-17
+ */
 #include <drivers/pcnet.h>
+#include <drivers/nic.h>
 #include <drivers/pci.h>
 #include <drivers/drv_core.h>
 #include <drivers/pit_timer.h>
@@ -141,6 +148,8 @@ struct pcnet_inst {
     unsigned rx_irqs;
     unsigned tx_irqs;
     int present;
+    unsigned rx_index;        /* net poll cursor */
+    unsigned tx_index;        /* net send cursor */
 };
 
 static struct pcnet_inst g_pcnet;
@@ -550,6 +559,13 @@ static const struct device_id pcnet_ids[] = {
     { 0, 0, 0 },
 };
 
+/* ------------------------------------------------------------------ *
+ *  Net-core interface (poll TX/RX over the descriptor rings):
+ *  the NIC registry (drivers/nic.h) gets a pcnet adapter on probe.
+ * ------------------------------------------------------------------ */
+
+static void pcnet_nic_register(void);
+
 static int pcnet_probe(struct device *dev)
 {
     struct pci_dev_info *inf = dev->private;
@@ -601,6 +617,7 @@ static int pcnet_probe(struct device *dev)
             (unsigned)bar0, g_pcnet.irq, g_pcnet.dma_phys);
 
     pcnet_hw_init();
+    pcnet_nic_register();
     return 0;
 }
 
@@ -613,4 +630,129 @@ static struct driver g_pcnet_driver = {
 void pcnet_driver_register(void)
 {
     driver_register(&g_pcnet_driver);
+}
+
+/* ------------------------------------------------------------------ */
+
+int pcnet_open(void)
+{
+    return g_pcnet.present ? 0 : -1;
+}
+
+void pcnet_get_mac(u8 mac[6])
+{
+    memcpy(mac, g_pcnet.mac, 6);
+}
+
+int pcnet_send(const u8 *frame, u32 len)
+{
+    struct pcnet_tmd *tmd;
+    unsigned slot;
+
+    if (!g_pcnet.present || !frame || len < PCNET_ETH_MIN_FRAME ||
+        len > PCNET_RX_BUF_SIZE)
+        return -1;
+
+    /* PCnet consumes its transmit descriptors strictly in ring order:
+     * after finishing one it parks at the NEXT descriptor (it never
+     * skips ahead or wraps early), so the only legal slot for a frame
+     * is exactly tx_index. Every descriptor shares one scratch buffer,
+     * which also means at most one frame may be outstanding: hand the
+     * slot over, demand TX, wait for the release, advance the cursor.
+     * The loopback self-test bypasses this queue with direct tmd[0]
+     * writes followed by a re-INIT, which resets the ring head to our
+     * cursor of 0. */
+    slot = g_pcnet.tx_index % PCNET_TX_RING;
+    tmd = &g_pcnet.dma->tmd[slot];
+    if (tmd->status & PCNET_TMD_OWN) {
+        for (unsigned i = 0; i < 100000 && (tmd->status & PCNET_TMD_OWN); i++)
+            ;
+        if (tmd->status & PCNET_TMD_OWN) {
+            /* Re-demand once: a predecessor frame may only flush the
+             * ring under another TDMD pulse (deferred-flush paths). */
+            u32 csr0 = pcnet_csr_read(0);
+            pcnet_csr_write(0, (u32)(csr0 | PCNET_CSR0_TDMD |
+                                     PCNET_CSR0_INEA | PCNET_CSR0_STRT));
+            for (unsigned i = 0;
+                 i < 100000 && (tmd->status & PCNET_TMD_OWN); i++)
+                ;
+            if (tmd->status & PCNET_TMD_OWN)
+                return -1;         /* wedged; caller retries */
+        }
+    }
+
+    memcpy(g_pcnet.dma->tx_buf, frame, len);
+
+    tmd->tbadr  = g_pcnet.dma_phys + PCNET_DMA_OFF_TX;
+    tmd->length = PCNET_ONES | (u16)(4096 - len);
+    tmd->misc   = 0;
+    tmd->res    = 0;
+    /* Release order: payload + length land before the ownership bit. */
+    __asm__ volatile("" ::: "memory");
+    tmd->status = PCNET_TMD_OWN | PCNET_TMD_STP | PCNET_TMD_ENP;
+    __asm__ volatile("" ::: "memory");
+
+    /* Demand transmission via read-modify-write (writing TDMD alone
+     * would clear STRT/INEA and stop the chip). */
+    {
+        u32 csr0 = pcnet_csr_read(0);
+        pcnet_csr_write(0, (u32)(csr0 | PCNET_CSR0_TDMD | PCNET_CSR0_INEA |
+                                 PCNET_CSR0_STRT));
+    }
+
+    /* QEMU completes the transfer inside the TDMD write; real hardware
+     * releases OWN at wire speed, still inside this window. */
+    for (unsigned i = 0; i < 100000 && (tmd->status & PCNET_TMD_OWN); i++)
+        ;
+    if (tmd->status & PCNET_TMD_OWN)
+        return -1;                 /* likely sent anyway; retry later */
+    g_pcnet.tx_index = (slot + 1) % PCNET_TX_RING;
+    return 0;
+}
+
+int pcnet_poll(int (*cb)(void *ctx, const u8 *frame, u32 len), void *ctx)
+{
+    int delivered = 0;
+
+    if (!g_pcnet.present)
+        return 0;
+
+    /* There is no need to stop the card while walking the RX list:
+     * PCnet_RMD_OWN is the only handshake and re-arming sets it last.
+     * Frames longer than our 2 KiB scratch could split across
+     * descriptors (QEMU never does this for MTU-sized frames): only
+     * single-buffer frames are read. */
+    for (unsigned i = 0; i < PCNET_RX_RING; i++) {
+        unsigned want = (g_pcnet.rx_index + i) % PCNET_RX_RING;
+        struct pcnet_rmd *rmd = &g_pcnet.dma->rmd[want];
+        if (rmd->status & PCNET_RMD_OWN)
+            continue;
+        if ((rmd->status & (PCNET_RMD_STP | PCNET_RMD_ENP)) ==
+            (PCNET_RMD_STP | PCNET_RMD_ENP)) {
+            u32 len = rmd->msg_length & 0x0FFFu;
+            if (cb && len >= PCNET_ETH_MIN_FRAME && len <= PCNET_RX_BUF_SIZE)
+                cb(ctx, g_pcnet.dma->rx_buf[want], len);
+            delivered++;
+        }
+        /* Re-arm unconditionally: even a malformed frame must return
+         * its buffer to the card. */
+        rmd->msg_length = 0;
+        rmd->res = 0;
+        __asm__ volatile("" ::: "memory");
+        rmd->status = PCNET_RMD_OWN;
+    }
+    return delivered;
+}
+
+static const struct net_nic g_pcnet_nic = {
+    .name    = "pcnet",
+    .open    = pcnet_open,
+    .get_mac = pcnet_get_mac,
+    .send    = pcnet_send,
+    .poll    = pcnet_poll,
+};
+
+static void pcnet_nic_register(void)
+{
+    net_nic_register(&g_pcnet_nic);
 }

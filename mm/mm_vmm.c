@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/mm/mm_vmm.c
+ * Description: Page-table walker and mapping primitives.
+ * Added: 2026-10-17
+ */
 #include <mm/mm_vmm.h>
 #include <core/core.h>
 #include <mm/mm_pmm.h>

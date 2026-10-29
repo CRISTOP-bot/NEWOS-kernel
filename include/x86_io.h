@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/include/x86_io.h
+ * Description: NEWOS headers interface
+ * Added: 2026-10-17
+ */
 #ifndef ARCH_X86_64_IO_H
 #define ARCH_X86_64_IO_H
 

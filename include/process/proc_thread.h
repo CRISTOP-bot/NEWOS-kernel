@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/include/process/proc_thread.h
+ * Description: A thread owns a kernel stack and a saved entry context. In this phase
+ * Added: 2026-10-17
+ */
 #ifndef KERNEL_THREAD_H
 #define KERNEL_THREAD_H
 

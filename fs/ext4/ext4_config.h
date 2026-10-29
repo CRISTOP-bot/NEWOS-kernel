@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/fs/ext4/ext4_config.h
+ * Description: NEWOS filesystem interface
+ * Added: 2026-10-17
+ */
 #ifndef EXT4_CONFIG_H
 #define EXT4_CONFIG_H
 

@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/lib/kernel/iru_lock.h
+ * Description: A plain store is a valid release on x86 (TSO); the locked RMW in
+ * Added: 2026-10-17
+ */
 #ifndef LIBK_LOCK_H
 #define LIBK_LOCK_H
 

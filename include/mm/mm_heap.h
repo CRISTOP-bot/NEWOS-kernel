@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/include/mm/mm_heap.h
+ * Description: Every pointer below is at least 16-byte aligned (HEAP_ALIGN), which is
+ * Added: 2026-10-17
+ */
 #ifndef MM_HEAP_KMALLOC_H
 #define MM_HEAP_KMALLOC_H
 

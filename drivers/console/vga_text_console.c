@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/drivers/console/vga_text_console.c
+ * Description: VGA 80x25 monochrome-on-color text console.
+ * Added: 2026-10-17
+ */
 #include <drivers/vga_console.h>
 #include <core/core.h>
 #include <x86_io.h>

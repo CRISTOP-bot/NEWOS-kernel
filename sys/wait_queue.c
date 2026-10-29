@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/sys/wait_queue.c
+ * Description: NEWOS system module
+ * Added: 2026-10-17
+ */
 #include <sys/wait_queue.h>
 #include <core/core_printk.h>
 #include <process/proc_process.h>

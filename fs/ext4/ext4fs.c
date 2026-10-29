@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/fs/ext4/ext4fs.c
+ * Description: NEWOS filesystem module
+ * Added: 2026-10-17
+ */
 #include <fs/ext4.h>
 #include <mm/mm_heap.h>
 #include <lib/kernel/iru_string.h>

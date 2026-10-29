@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/include/drivers/ps2.h
+ * Description: i8042 PS/2 controller: keyboard (port 1, IRQ1) + auxiliary mouse
+ * Added: 2026-10-17
+ */
 #ifndef DRIVERS_PS2_H
 #define DRIVERS_PS2_H
 

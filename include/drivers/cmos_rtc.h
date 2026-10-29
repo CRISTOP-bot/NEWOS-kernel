@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/include/drivers/cmos_rtc.h
+ * Description: PC CMOS real-time clock (ports 0x70/0x71): the only wall-clock source
+ * Added: 2026-10-17
+ */
 #ifndef DRIVERS_CMOS_RTC_H
 #define DRIVERS_CMOS_RTC_H
 

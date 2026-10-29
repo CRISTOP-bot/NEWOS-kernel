@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/include/abi/syscall_abi.h
+ * Description: User/kernel shared syscall ABI.
+ * Added: 2026-10-17
+ */
 #ifndef UAPI_SYSCALL_H
 #define UAPI_SYSCALL_H
 
@@ -36,6 +42,7 @@
 #define SYS_WRITEV   20
 #define SYS_ACCESS   21
 #define SYS_PIPE     22
+#define SYS_SELECT   23   /* legacy select: rdi=nfds rsi/rx/r10=fd_set */
 #define SYS_SCHED_YIELD 24
 #define SYS_MADVISE  28
 #define SYS_DUP      32
@@ -49,6 +56,8 @@
 #define SYS_KILL     62
 #define SYS_UNAME    63
 #define SYS_FCNTL    72
+#define SYS_FSYNC    74   /* no-op success: the VFS is RAM-backed */
+#define SYS_FDATASYNC 75
 #define SYS_TRUNCATE 76
 #define SYS_FTRUNCATE 77
 #define SYS_GETCWD   79
@@ -58,6 +67,10 @@
 #define SYS_RMDIR    84
 #define SYS_UNLINK   87
 #define SYS_READLINK 89
+#define SYS_CHMOD    90
+#define SYS_FCHMOD   91
+#define SYS_CHOWN    92
+#define SYS_FCHOWN   93
 #define SYS_UMASK    95
 #define SYS_GETTIMEOFDAY 96
 #define SYS_TIMES    100
@@ -75,6 +88,7 @@
 #define SYS_CLOCK_GETTIME 228
 #define SYS_EXIT_GROUP 231
 #define SYS_NEWFSTATAT 262
+#define SYS_PSELECT6 270
 #define SYS_GETRANDOM 318
 
 /* NEWOS vendor block. */
@@ -88,6 +102,9 @@
 #define SYS_READDIR    457   /* legacy nsh_dirent form, path-based */
 #define SYS_GETTIME    458   /* CMOS nsh_time form */
 #define SYS_SYSINFO    459
+#define SYS_KBD_GRAB   460   /* rdi=1 grab PS/2 keyboard, rdi=0 release */
+#define SYS_KBD_READ   461   /* rdi=buf, rsi=len; non-blocking bytes */
+#define SYS_CONSOLE_GUI 462  /* rdi=1 suspend fbcon for a framebuffer GUI */
 
 /* SEEK_* for SYS_LSEEK (rdi=fd, rsi=offset, rdx=whence; returns new pos). */
 #define SEEK_SET 0
@@ -156,6 +173,20 @@ typedef signed long long   nsh_s64;
 #define NSH_TIOCGWINSZ 0x5413
 #define NSH_TIOCSWINSZ 0x5414
 #define NSH_FIONREAD   0x541B
+
+/* ---- poll/select -------------------------------------------------------- */
+#define NSH_POLLIN   0x001
+#define NSH_POLLOUT  0x004
+#define NSH_POLLERR  0x008
+#define NSH_POLLHUP  0x010
+#define NSH_POLLNVAL 0x020
+
+/* SYS_POLL record: Linux struct pollfd (8 bytes). */
+struct nsh_pollfd {
+    nsh_s32 fd;
+    nsh_u16 events;
+    nsh_u16 revents;
+};
 
 /* ---- arch_prctl codes --------------------------------------------------- */
 #define NSH_ARCH_SET_GS 0x1001
@@ -342,6 +373,8 @@ typedef char nsh_abi_termios_cc_offset_must_be_17[
     __builtin_offsetof(struct nsh_termios, c_cc) == 17 ? 1 : -1];
 typedef char nsh_abi_timespec_size_must_be_16[
     sizeof(struct nsh_timespec) == 16 ? 1 : -1];
+typedef char nsh_abi_pollfd_size_must_be_8[
+    sizeof(struct nsh_pollfd) == 8 ? 1 : -1];
 typedef char nsh_abi_fbwrite_size_must_be_48[
     sizeof(struct nsh_fbwrite) == 48 ? 1 : -1];
 typedef char nsh_abi_mouse_size_must_be_32[

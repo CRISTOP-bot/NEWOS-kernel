@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/process/proc_process.c
+ * Description: Process implementation: ELF loading into a private address space, fd
+ * Added: 2026-10-17
+ */
 #include <process/proc_process.h>
 #include <process/proc_thread.h>
 #include <process/proc_elf.h>
@@ -6,6 +12,7 @@
 #include <mm/mm_pmm.h>
 #include <core/core_printk.h>
 #include <core/core_panic.h>
+#include <core/core_console.h>
 #include <mm/mm_vmm.h>
 #include <fs/vfs.h>
 #include <ipc/ipc.h>
@@ -41,6 +48,11 @@ void process_current_set(struct process *p)
  * than the process's own (killing the stack mid-use corrupts memory). */
 void process_free(struct process *p)
 {
+    /* A crashed or killed GUI must not keep the PS/2 keyboard stolen from
+     * the shell that regains control after it exits. */
+    core_console_kbd_release_if((int)p->pid);
+    core_console_fb_gui_release_if((int)p->pid);
+
     /* If this process owned the register bank, its FXSAVE image is about to
      * disappear: the epilogue must not park the live registers into freed
      * memory on the next handoff. */

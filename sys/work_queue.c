@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/sys/work_queue.c
+ * Description: NEWOS system module
+ * Added: 2026-10-17
+ */
 #include <sys/work_queue.h>
 #include <lib/kernel/iru_lock.h>
 #include <core/core_printk.h>

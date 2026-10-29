@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/include/mm/mm_pmm.h
+ * Description: Physical Memory Manager.
+ * Added: 2026-10-17
+ */
 #ifndef MM_PMM_H
 #define MM_PMM_H
 

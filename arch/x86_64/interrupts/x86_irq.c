@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/arch/x86_64/interrupts/x86_irq.c
+ * Description: Generic 8259 IRQ dispatch.
+ * Added: 2026-10-17
+ */
 #include <x86_irq.h>
 #include <core/core_types.h>
 #include <core/core_panic.h>

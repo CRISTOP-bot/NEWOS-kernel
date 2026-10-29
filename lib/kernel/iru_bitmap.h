@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/lib/kernel/iru_bitmap.h
+ * Description: Find the first free (zero) bit at or after `start`. Returns upper
+ * Added: 2026-10-17
+ */
 #ifndef LIBK_BITMAP_H
 #define LIBK_BITMAP_H
 

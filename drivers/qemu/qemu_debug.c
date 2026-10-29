@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/drivers/qemu/qemu_debug.c
+ * Description: QEMU's isa-debug-exit device: writing a byte to port 0xf4 makes QEMU
+ * Added: 2026-10-17
+ */
 #include <drivers/qemu_debug.h>
 #include <x86_io.h>
 

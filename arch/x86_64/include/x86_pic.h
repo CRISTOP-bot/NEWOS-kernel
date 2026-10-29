@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/arch/x86_64/include/x86_pic.h
+ * Description: NEWOS arch interface
+ * Added: 2026-10-17
+ */
 #ifndef ARCH_X86_64_PIC_H
 #define ARCH_X86_64_PIC_H
 

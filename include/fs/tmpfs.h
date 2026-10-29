@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/include/fs/tmpfs.h
+ * Description: tmpfs public API.
+ * Added: 2026-10-17
+ */
 #ifndef FS_TMPFS_H
 #define FS_TMPFS_H
 

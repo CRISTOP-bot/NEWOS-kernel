@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/mm/mm_debug.c
+ * Description: Memory debugging helpers. Counts live allocations and reports PMM and
+ * Added: 2026-10-17
+ */
 #include <core/core_printk.h>
 #include <mm/mm_pmm.h>
 #include <mm/mm_heap.h>

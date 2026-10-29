@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/fs/procfs/procfs.c
+ * Description: procfs: the read-only kernel information filesystem mounted at /proc.
+ * Added: 2026-10-17
+ */
 #include <fs/vfs.h>
 #include <fs/procfs/procfs.h>
 #include <core/core_bootinfo.h>

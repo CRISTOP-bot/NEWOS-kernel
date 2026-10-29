@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/fs/sysfs/sysfs.c
+ * Description: sysfs: the read-only kernel/device tree mounted at /sys.
+ * Added: 2026-10-17
+ */
 #include <fs/vfs.h>
 #include <fs/sysfs/sysfs.h>
 #include <core/core_printk.h>

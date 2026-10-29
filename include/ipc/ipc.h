@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/include/ipc/ipc.h
+ * Description: Inter-Process Communication primitives.
+ * Added: 2026-10-17
+ */
 #ifndef KERNEL_IPC_H
 #define KERNEL_IPC_H
 

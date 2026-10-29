@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/include/core/core_types.h
+ * Description: Kernel-internal type aliases. Integer widths and the pointer-width
+ * Added: 2026-10-17
+ */
 #ifndef KERNEL_TYPES_H
 #define KERNEL_TYPES_H
 

@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/drivers/console/tty_console.c
+ * Description: Built-in serial console backend.
+ * Added: 2026-10-17
+ */
 #include <drivers/tty_console.h>
 #include <drivers/serial_16550.h>
 

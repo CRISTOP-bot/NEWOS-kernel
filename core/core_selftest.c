@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/core/core_selftest.c
+ * Description: Phase 2 unit tests: PMM phys wrappers, address-space lifecycle + CR3
+ * Added: 2026-10-17
+ */
 #include <core/core_printk.h>
 #include <drivers/pit_timer.h>
 #include <process/sched.h>
@@ -13,6 +19,9 @@
 #include <x86_frame.h>
 #include <x86_cpu.h>
 #include <x86_fpu.h>
+#include <drivers/ata.h>
+#include <drivers/hda.h>
+#include <net/net_stack.h>
 #include <iru_string.h>
 
 /* Phase 2 unit tests: PMM phys wrappers, address-space lifecycle + CR3
@@ -626,6 +635,398 @@ fail:
     return 0;
 }
 
+static int ktest2_ata(void)
+{
+    block_dev_t *d = ata_get_dev();
+    if (!d) {
+        printk("    ata-disk0: no IDE disk attached, skipped\n");
+        return 0;
+    }
+
+    u8 orig[512], pattern[512], back[512];
+    u64 lba = d->sector_count - 1;
+
+    /* remember the sector, clobber it with a known pattern, read the
+     * same data back through the layers again, then restore. */
+    for (int i = 0; i < 512; i++)
+        pattern[i] = (u8)(i ^ 0x5A);
+    if (block_dev_read(d, lba, 1, orig) != 0)
+        return -1;
+    if (block_dev_write(d, lba, 1, pattern) != 0)
+        return -1;
+    if (block_dev_read(d, lba, 1, back) != 0)
+        return -1;
+    if (memcmp(back, pattern, sizeof(back)) != 0)
+        return -1;
+    if (block_dev_write(d, lba, 1, orig) != 0)
+        return -1;
+
+    printk("    ata-disk0: r/w verified on lba %llu of %s (%llu sectors)\n",
+           lba, d->name, d->sector_count);
+    return 0;
+}
+
+static int ktest2_fat32(void)
+{
+    if (!vfs_lookup("/fat")) {
+        printk("    fat32-rw: no FAT32 volume mounted, skipped\n");
+        return 0;
+    }
+
+    /* Create, write, close, reopen, verify in place. */
+    struct vfs_file *f = vfs_open("/fat/NEWOS.TST",
+                                  VFS_O_CREATE | VFS_O_WRITE);
+    if (!f)
+        return -1;
+    const char *msg = "fat32 read-write: NEWOS was here\n";
+    if (vfs_write(f, msg, strlen(msg)) != (int)strlen(msg))
+        goto fail_file;
+    if (vfs_close(f) != 0)
+        return -1;
+
+    char back[64];
+    f = vfs_open("/fat/NEWOS.TST", VFS_O_READ);
+    if (!f)
+        return -1;
+    int rn = vfs_read(f, back, sizeof(back));
+    if (rn != (int)strlen(msg) || memcmp(back, msg, rn) != 0)
+        goto fail_read;
+    if (vfs_close(f) != 0)
+        return -1;
+
+    /* Nested directory + file inside, then delete in reverse order. */
+    if (vfs_mkdir("/fat/SUBTST") != 0)
+        return -1;
+    struct vfs_file *g = vfs_open("/fat/SUBTST/INTEGER",
+                                  VFS_O_CREATE | VFS_O_WRITE);
+    if (!g)
+        return -1;
+    if (vfs_write(g, "42\n", 3) != 3 || vfs_close(g) != 0)
+        return -1;
+    if (vfs_unlink("/fat/SUBTST/INTEGER") != 0)
+        return -1;
+    if (vfs_unlink("/fat/SUBTST") != 0)
+        return -1;
+    if (vfs_lookup("/fat/SUBTST/INTEGER") || vfs_lookup("/fat/SUBTST"))
+        return -1;                 /* both must be gone */
+
+    if (vfs_unlink("/fat/NEWOS.TST") != 0)
+        return -1;
+    if (vfs_lookup("/fat/NEWOS.TST"))
+        return -1;
+
+    printk("    fat32-rw: file r/w + mkdir + unlink verified on /fat\n");
+    return 0;
+
+fail_read:
+    vfs_close(f);
+    return -1;
+
+fail_file:
+    vfs_close(f);
+    return -1;
+}
+
+static int ktest2_iso9660(void)
+{
+    if (!vfs_lookup("/iso")) {
+        printk("    iso9660-ro: no ISO 9660 volume mounted, skipped\n");
+        return 0;
+    }
+
+    /* Root file round-trip. */
+    struct vfs_file *f = vfs_open("/iso/HELLO.TXT", VFS_O_READ);
+    if (!f) {
+        printk("    iso9660-ro: open /iso/HELLO.TXT failed\n");
+        return -1;
+    }
+    const char *msg = "NEWOS iso9660 rocks\n";
+    char back[64];
+    int rn = vfs_read(f, back, sizeof(back));
+    if (vfs_close(f) != 0)
+        return -1;
+    if (rn != (int)strlen(msg) || memcmp(back, msg, rn) != 0) {
+        printk("    iso9660-ro: HELLO.TXT mismatch (%d bytes)\n", rn);
+        return -1;
+    }
+
+    /* Multi-block file (larger than one 2048-byte ISO block... and
+     * larger than the 512-byte device sectors beneath it). */
+    f = vfs_open("/iso/BIG.TXT", VFS_O_READ);
+    if (!f) {
+        printk("    iso9660-ro: open /iso/BIG.TXT failed\n");
+        return -1;
+    }
+    u32 size = f->inode->size;
+    if (size < 4096) {
+        printk("    iso9660-ro: BIG.TXT size %u too small\n", size);
+        vfs_close(f);
+        return -1;
+    }
+    u8 *body = kmalloc(size);
+    if (!body) {
+        vfs_close(f);
+        return -1;
+    }
+    int total = vfs_read(f, body, size);
+    if (vfs_close(f) != 0)
+        return -1;
+    int ok = total == (int)size;
+    for (int i = 0; ok && i < total; i++)
+        if (body[i] != (u8)('0' + (i % 10)))
+            ok = 0;
+    kfree(body);
+    if (!ok) {
+        printk("    iso9660-ro: BIG.TXT read %d/%u bytes, pattern %s\n",
+               total, size, ok ? "ok" : "broken");
+        return -1;
+    }
+
+    /* Nested directory. */
+    f = vfs_open("/iso/DOCS/INNER.TXT", VFS_O_READ);
+    if (!f) {
+        printk("    iso9660-ro: open /iso/DOCS/INNER.TXT failed\n");
+        return -1;
+    }
+    const char *inner = "inner\n";
+    rn = vfs_read(f, back, sizeof(back));
+    if (vfs_close(f) != 0)
+        return -1;
+    if (rn != (int)strlen(inner) || memcmp(back, inner, rn) != 0) {
+        printk("    iso9660-ro: INNER.TXT mismatch (%d bytes)\n", rn);
+        return -1;
+    }
+
+    /* Read-only guards: mkdir, create and unlink must all refuse. */
+    if (vfs_mkdir("/iso/NAH") == 0) {
+        printk("    iso9660-ro: mkdir was accepted (must refuse)\n");
+        return -1;
+    }
+    if (vfs_create("/iso/NAH.TXT") == 0) {
+        printk("    iso9660-ro: create was accepted (must refuse)\n");
+        return -1;
+    }
+    if (vfs_unlink("/iso/HELLO.TXT") == 0) {
+        printk("    iso9660-ro: unlink was accepted (must refuse)\n");
+        return -1;
+    }
+
+    printk("    iso9660-ro: files + nested dir verified on /iso\n");
+    return 0;
+}
+
+static int ktest2_romfs(void)
+{
+    if (!vfs_lookup("/rom")) {
+        printk("    romfs-ro: no romfs volume mounted, skipped\n");
+        return 0;
+    }
+
+    /* Root file round-trip. */
+    struct vfs_file *f = vfs_open("/rom/HELLO.TXT", VFS_O_READ);
+    if (!f) {
+        printk("    romfs-ro: open /rom/HELLO.TXT failed\n");
+        return -1;
+    }
+    const char *msg = "NEWOS romfs rocks\n";
+    char back[64];
+    int rn = vfs_read(f, back, sizeof(back));
+    if (vfs_close(f) != 0) {
+        printk("    romfs-ro: close HELLO.TXT failed\n");
+        return -1;
+    }
+    if (rn != (int)strlen(msg) || memcmp(back, msg, rn) != 0) {
+        printk("    romfs-ro: HELLO.TXT content mismatch (%d bytes)\n", rn);
+        return -1;
+    }
+
+    /* Hard-linked entry shares data with its target. */
+    f = vfs_open("/rom/LINK.TXT", VFS_O_READ);
+    if (!f) {
+        printk("    romfs-ro: open /rom/LINK.TXT failed\n");
+        return -1;
+    }
+    rn = vfs_read(f, back, sizeof(back));
+    if (vfs_close(f) != 0)
+        return -1;
+    if (rn != (int)strlen(msg) || memcmp(back, msg, rn) != 0) {
+        printk("    romfs-ro: LINK.TXT content mismatch (%d bytes)\n", rn);
+        return -1;
+    }
+
+    /* Multi-block file: the read path splits over the chunk cap. */
+    f = vfs_open("/rom/BIG.TXT", VFS_O_READ);
+    if (!f) {
+        printk("    romfs-ro: open /rom/BIG.TXT failed\n");
+        return -1;
+    }
+    u32 size = f->inode->size;
+    if (size < 4096) {
+        printk("    romfs-ro: BIG.TXT size %u too small\n", size);
+        vfs_close(f);
+        return -1;
+    }
+    u8 *body = kmalloc(size);
+    if (!body) {
+        vfs_close(f);
+        return -1;
+    }
+    int total = 0;
+    while (total < (int)size) {
+        int n = vfs_read(f, body + total, size - total);
+        if (n <= 0)
+            break;
+        total += n;
+    }
+    if (vfs_close(f) != 0)
+        return -1;
+    int ok = total == (int)size;
+    for (int i = 0; ok && i < total; i++)
+        if (body[i] != (u8)('0' + (i % 10)))
+            ok = 0;
+    kfree(body);
+    if (!ok) {
+        printk("    romfs-ro: BIG.TXT read %d/%u bytes, pattern %s\n",
+               total, size, ok ? "ok" : "broken");
+        return -1;
+    }
+
+    /* Nested directory + read-only guards. */
+    f = vfs_open("/rom/DOCS/INNER.TXT", VFS_O_READ);
+    if (!f) {
+        printk("    romfs-ro: open /rom/DOCS/INNER.TXT failed\n");
+        return -1;
+    }
+    const char *inner = "inner\n";
+    rn = vfs_read(f, back, sizeof(back));
+    if (vfs_close(f) != 0)
+        return -1;
+    if (rn != (int)strlen(inner) || memcmp(back, inner, rn) != 0) {
+        printk("    romfs-ro: INNER.TXT mismatch (%d bytes)\n", rn);
+        return -1;
+    }
+    if (vfs_mkdir("/rom/NAH") == 0) {
+        printk("    romfs-ro: mkdir was accepted (must refuse)\n");
+        return -1;
+    }
+    if (vfs_create("/rom/NAH.TXT") == 0) {
+        printk("    romfs-ro: create was accepted (must refuse)\n");
+        return -1;
+    }
+    if (vfs_unlink("/rom/HELLO.TXT") == 0) {
+        printk("    romfs-ro: unlink was accepted (must refuse)\n");
+        return -1;
+    }
+
+    printk("    romfs-ro: files + hardlink + nested dir verified on /rom\n");
+    return 0;
+}
+
+static int ktest2_net_ping(void)
+{
+    if (!net_up()) {
+        printk("    net-ping: no NIC attached, skipped\n");
+        return 0;
+    }
+
+    static const char payload[] = "NEWOS net-ping";
+    u8 reply[64];
+    u32 rlen = 0;
+
+    if (net_icmp_ping(net_ip_gw(), payload, sizeof(payload) - 1,
+                      reply, &rlen, 3000000) != 0)
+        return -1;                 /* gateway must echo us */
+    if (rlen != sizeof(payload) - 1 || memcmp(reply, payload, rlen) != 0)
+        return -1;                 /* payload must come back intact */
+
+    printk("    net-ping: gw echoed %u bytes back\n", rlen);
+    return 0;
+}
+
+/* A4 sine, 0.25 s, generated integer-only: the quarter-wave table holds
+ * quarter-wave table holds A*sin(p*pi/128) for p=0..64, and the frame
+ * loop walks a 32-bit phase accumulator at 440 Hz / 48 kHz. */
+static const s16 hda_quarter[65] = {
+    0, 491, 981, 1471, 1960, 2448, 2935, 3419, 3902, 4382, 4860,
+    5334, 5806, 6274, 6738, 7198, 7654, 8105, 8551, 8992, 9428,
+    9858, 10282, 10700, 11111, 11516, 11914, 12305, 12688, 13063,
+    13431, 13791, 14142, 14485, 14819, 15144, 15460, 15767, 16064,
+    16352, 16629, 16897, 17155, 17402, 17638, 17864, 18080, 18284,
+    18478, 18660, 18831, 18991, 19139, 19276, 19401, 19514, 19616,
+    19706, 19784, 19850, 19904, 19946, 19976, 19994, 20000
+};
+
+static s16 hda_sine_sample(u32 phase)
+{
+    u32 idx = (phase >> 24) & 0xffu;
+    u32 pos = idx & 0x3fu;
+    s16 base = (idx >> 6) & 1u ? hda_quarter[64u - pos]
+                               : hda_quarter[pos];
+    return (idx >> 6) & 2u ? (s16)-base : base;
+}
+
+static int ktest2_hda(void)
+{
+    if (!hda_present()) {
+        printk("    hda: no HD-Audio codec attached, skipped\n");
+        return 0;
+    }
+
+    /* 0.25 s at 48 kHz stereo 16-bit = 12000 frames = 48000 bytes in
+     * one contiguous physical block; the frames alternate between a
+     * mild chirp and a simpler vibrato pattern to exercise the ring. */
+    u64 frame;
+    if (phys_alloc_block(4, &frame)) {
+        printk("    hda: no 64K physical block for PCM\n");
+        return -1;
+    }
+    u64 pcm_phys = frame << 12;
+    s16 *pcm = (s16 *)phys_to_virt(pcm_phys);
+    u32 step = (u32)(440ull * 0x100000000ull / 48000ull);
+    u32 phase = 0;
+    for (u32 i = 0; i < 12000u; i++) {
+        s16 v = hda_sine_sample(phase);
+        pcm[2u * i] = v;
+        pcm[2u * i + 1u] = v;
+        phase += step;
+    }
+
+    long played = hda_play(pcm_phys, 48000, 48000, 2, 16);
+    if (played != 48000) {
+        printk("    hda: playback returned %ld (expected 48000)\n", played);
+        return -1;
+    }
+
+    printk("    hda: A4 sine, 0.25 s @ 48 kHz delivered through SD4\n");
+    return 0;
+}
+
+static int ktest2_net_e1000(void)
+{
+    if (net_start_nic("e1000") != 0) {
+        printk("    net-e1000: no e1000 NIC attached, skipped\n");
+        return 0;
+    }
+
+    static const char payload[] = "NEWOS e1000 ping";
+    u8 reply[64];
+    u32 rlen = 0;
+    int rc = 0;
+
+    if (net_icmp_ping(net_ip_gw(), payload, sizeof(payload) - 1,
+                      reply, &rlen, 3000000) != 0)
+        rc = -1;                   /* gateway must echo us via e1000 */
+    else if (rlen != sizeof(payload) - 1 ||
+             memcmp(reply, payload, rlen) != 0)
+        rc = -1;                   /* payload must come back intact */
+    else
+        printk("    net-e1000: gw echoed %u bytes back\n", rlen);
+
+    /* Restore the boot NIC so later stages see the usual stack. */
+    net_start_nic(NULL);
+    return rc;
+}
+
 struct ktest2 {
     const char *name;
     int (*fn)(void);
@@ -641,6 +1042,13 @@ static const struct ktest2 ktests2[] = {
     { "timer-pit",   ktest2_timer       },
     { "proc-life",   ktest2_proc_life   },
     { "fpu-state",   ktest2_fpu         },
+    { "ata-disk0",   ktest2_ata         },
+    { "fat32-rw",    ktest2_fat32       },
+    { "iso9660-ro",  ktest2_iso9660     },
+    { "romfs-ro",    ktest2_romfs       },
+    { "net-ping",    ktest2_net_ping    },
+    { "net-e1000",   ktest2_net_e1000   },
+    { "hda",         ktest2_hda         },
 };
 
 int run_phase2_tests(void)

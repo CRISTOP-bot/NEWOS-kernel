@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/drivers/input/ps2_keyboard.c
+ * Description: PS/2 keyboard: scancode set 1 (the controller translates, as the BIOS
+ * Added: 2026-10-17
+ */
 #include <drivers/ps2.h>
 #include <core/core_console.h>
 #include <core/core_printk.h>

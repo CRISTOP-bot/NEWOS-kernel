@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/arch/x86_64/boot/x86_pvh.c
+ * Description: Parses the QEMU PVH start-info structure and feeds the memory map into
+ * Added: 2026-10-17
+ */
 #include <core/core_bootinfo.h>
 #include <core/core_printk.h>
 #include <mm/mm_pmm.h>

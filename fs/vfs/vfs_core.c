@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/fs/vfs/vfs_core.c
+ * Description: Default no-op operations for plain VFS nodes.
+ * Added: 2026-10-17
+ */
 #include <fs/vfs.h>
 #include <fs/tmpfs.h>
 #include <mm/mm_heap.h>
@@ -180,8 +186,11 @@ int vfs_unlink(const char *path)
     if (!in)
         return -1;
     /* Synthetic trees (devfs/procfs/sysfs) are read-only. Only nodes owned
-     * by the VFS core (directories) or tmpfs (files) may be removed. */
-    if (in->ops != &default_ops && !tmpfs_is_node(in))
+     * by the VFS core (directories), tmpfs (files) or children of real
+     * disk-backed directories (the parent knows how to create, so it also
+     * knows how to destroy its children through ops->destroy) may go. */
+    if (in->ops != &default_ops && !tmpfs_is_node(in) &&
+        !(parent->ops && (parent->ops->create || parent->ops->mkdir)))
         return -1;
     if ((in->mode & VFS_MODE_TYPE_MASK) == VFS_MODE_DIR &&
         !list_is_empty(&in->children))
@@ -306,6 +315,15 @@ int vfs_mkdir(const char *path)
     if (find_child(parent, name))
         return -1;   /* exists */
 
+    /* Disk-backed directories build their child on the device; plain
+     * directories keep materializing through tmpfs. Foreign mounts that
+     * carry no mkdir hook are read-only at this level (romfs, iso9660,
+     * procfs, ...): refuse instead of materializing a child the backend
+     * will never acknowledge. */
+    if (parent->ops && parent->ops->mkdir)
+        return parent->ops->mkdir(parent, name);
+    if (parent->ops && parent->ops != &default_ops && !tmpfs_is_node(parent))
+        return -1;
     struct vfs_inode *dir = vfs_alloc_inode(
         parent, name, VFS_MODE_DIR | 0755, &default_ops, NULL);
     return dir ? 0 : -1;
@@ -343,9 +361,19 @@ int vfs_create(const char *path)
         return 0;   /* already exists: treat as success */
 
     /* Regular files live on tmpfs so they support read/write through the
-     * same ops as the rest of the tree (a bare VFS node would refuse I/O). */
-    struct vfs_inode *in = tmpfs_create_node(parent, name,
-                                             VFS_MODE_REG | 0644);
+     * same ops as the rest of the tree (a bare VFS node would refuse I/O),
+     * unless the parent is a real disk-backed directory, which creates its
+     * own child. Foreign mounts without create/hooks are read-only here
+     * (romfs, iso9660, procfs, ...): refuse so no unacknowledged in-memory
+     * child shadows them. */
+    struct vfs_inode *in;
+    if (parent->ops && parent->ops->create)
+        in = parent->ops->create(parent, name, VFS_MODE_REG | 0644);
+    else if (parent->ops && parent->ops != &default_ops &&
+             !tmpfs_is_node(parent))
+        return -1;
+    else
+        in = tmpfs_create_node(parent, name, VFS_MODE_REG | 0644);
     return in ? 0 : -1;
 }
 

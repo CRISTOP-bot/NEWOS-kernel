@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/arch/x86_64/include/x86_frame.h
+ * Description: Layout of a saved interrupt frame. isr_common pushes GPRs in the order
+ * Added: 2026-10-17
+ */
 #ifndef ARCH_X86_64_IFRAME_H
 #define ARCH_X86_64_IFRAME_H
 

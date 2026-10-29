@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/include/process/proc_process.h
+ * Description: Fixed base where anonymous SYS_MMAP regions start being handed out.
+ * Added: 2026-10-17
+ */
 #ifndef KERNEL_PROCESS_H
 #define KERNEL_PROCESS_H
 

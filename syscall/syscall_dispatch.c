@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/syscall/syscall_dispatch.c
+ * Description: Resolve a user path against the caller's cwd into `out` (512 bytes).
+ * Added: 2026-10-17
+ */
 #include <syscall/syscall.h>
 #include <process/proc_process.h>
 #include <process/proc_thread.h>
@@ -288,16 +294,36 @@ long syscall_dispatch(struct x64_iframe *f)
             break;
         }
 
+        /* Regular files fill the whole request: like Linux, a read() on a
+         * file returns the full count unless EOF is reached. The bounce
+         * buffer is 512 bytes, so loop over it instead of truncating the
+         * syscall. A single short read is legal, but direct readers that
+         * skip the short-read loop (tcc's archive loader does exactly one
+         * read() for the ar symbol table) fail without a diagnostic.
+         * Pipes and the serial console above keep their short semantics. */
         static u8 kbuf[512];
-        if (len > sizeof(kbuf))
-            len = sizeof(kbuf);
-        int n = vfs_read(p->fds[fd].file, kbuf, (size_t)len);
-        if (n < 0)
-            break;
-        if (n > 0 && copy_to_user((void *)(uintptr_t)f->rsi, kbuf,
-                                  (size_t)n) != 0)
-            break;
-        ret = n;
+        long total = 0;
+        while ((u64)total < len) {
+            size_t chunk = len - (u64)total > sizeof(kbuf)
+                               ? sizeof(kbuf)
+                               : (size_t)(len - (u64)total);
+            int n = vfs_read(p->fds[fd].file, kbuf, chunk);
+            if (n < 0) {
+                total = total ? total : n;
+                break;
+            }
+            if (n == 0)
+                break;              /* EOF */
+            if (copy_to_user((u8 *)(uintptr_t)f->rsi + total, kbuf,
+                             (size_t)n) != 0) {
+                total = total ? total : SYSCALL_RET_ERROR;
+                break;
+            }
+            total += n;
+            if ((size_t)n < chunk)
+                break;              /* short read: EOF for a file */
+        }
+        ret = total;
         break;
     }
 
@@ -914,6 +940,42 @@ long syscall_dispatch(struct x64_iframe *f)
         if (copy_to_user((void *)(uintptr_t)f->rdi, &m, sizeof(m)) != 0)
             break;
         ret = 0;
+        break;
+    }
+
+    case SYS_KBD_GRAB: {
+        int on = (int)f->rdi;
+
+        if (!p || (on != 0 && on != 1))
+            break;
+        ret = core_console_kbd_grab((int)p->pid, on);
+        break;
+    }
+
+    case SYS_CONSOLE_GUI: {
+        int on = (int)f->rdi;
+
+        if (!p || (on != 0 && on != 1))
+            break;
+        ret = core_console_fb_gui((int)p->pid, on);
+        break;
+    }
+
+    case SYS_KBD_READ: {
+        u8 buf[64];
+        u64 len = f->rsi;
+
+        if (!len) {
+            ret = 0;
+            break;
+        }
+        if (len > sizeof(buf))
+            len = sizeof(buf);
+        int n = core_console_kbd_gui_read(buf, (int)len);
+        if (n > 0 &&
+            copy_to_user((void *)(uintptr_t)f->rdi, buf, (size_t)n) != 0)
+            break;
+        ret = n;
         break;
     }
 

@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/arch/x86_64/memory/x86_paging.c
+ * Description: Early page tables populating code (see arch/x86_64/mmu.h). The tables
+ * Added: 2026-10-17
+ */
 #include <x86_mmu.h>
 #include <x86_cpu.h>
 #include <core/core_printk.h>
@@ -10,6 +16,15 @@
 
 #define EFER_MSR          0xC0000080
 #define EFER_NXE          (1ull << 11)
+#define EFER_SCE          (1ull << 0)
+
+/* Linux x86-64 SYSCALL MSRs.  Static musl/glibc binaries (BusyBox included)
+ * use SYSCALL; keep LSTAR/FMASK/STAR in sync with the assembly entry stub. */
+#define STAR_MSR          0xC0000081
+#define LSTAR_MSR         0xC0000082
+#define FMASK_MSR         0xC0000084
+
+extern void syscall_entry(void);
 
 void x64_paging_init(void)
 {
@@ -19,8 +34,19 @@ void x64_paging_init(void)
     u32 lo, hi;
     rdmsr(EFER_MSR, &lo, &hi);
     u64 efer = ((u64)hi << 32) | lo;
-    efer |= EFER_NXE;
+    efer |= EFER_NXE | EFER_SCE;
     wrmsr(EFER_MSR, (u32)efer, (u32)(efer >> 32));
+
+    /* SYSCALL entry: kernel CS/SS in STAR[47:32], SYSRET selects in
+     * STAR[63:48] (the return path uses IRETQ, but the field is still
+     * programmed to a valid user selector pair).  FMASK clears IF before
+     * the stub runs; it switches stacks with interrupts already off. */
+    wrmsr(STAR_MSR, 0, (u32)((0x10u << 16) | 0x08u));
+    {
+        u64 entry = (u64)(uintptr_t)syscall_entry;
+        wrmsr(LSTAR_MSR, (u32)entry, (u32)(entry >> 32));
+    }
+    wrmsr(FMASK_MSR, 0x200u, 0);
 
     /* The direct physical map (phys_to_virt()) must be live before any C
      * code dereferences a physical address. Verify the trampoline wiring:

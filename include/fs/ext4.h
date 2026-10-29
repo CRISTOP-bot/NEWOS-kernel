@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/include/fs/ext4.h
+ * Description: NEWOS headers interface
+ * Added: 2026-10-17
+ */
 #ifndef EXT4_H
 #define EXT4_H
 

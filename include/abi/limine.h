@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/include/abi/limine.h
+ * Description: Limine boot protocol (boot ABI) definitions, matching the Limine boot
+ * Added: 2026-10-17
+ */
 #ifndef KERNEL_LIMINE_H
 #define KERNEL_LIMINE_H
 

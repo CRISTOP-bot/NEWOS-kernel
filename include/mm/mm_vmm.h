@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/include/mm/mm_vmm.h
+ * Description: Virtual Memory Manager.
+ * Added: 2026-10-17
+ */
 #ifndef KERNEL_VMM_H
 #define KERNEL_VMM_H
 

@@ -11,8 +11,36 @@
 ; ============================================================================
 
 [EXTERN isr_handler]
+[EXTERN g_syscall_kernel_rsp]
 
 section .text
+
+; ---------------------------------------------------------------------------
+; Linux x86-64 `syscall` entry.
+;
+; Static musl/glibc binaries (including BusyBox) use the `syscall`
+; instruction, not NEWOS's `int $0x80` gate.  The instruction does not switch
+; stacks, so the first job is to park the user RSP and move to the current
+; thread's kernel stack (TSS.RSP0, mirrored in g_syscall_kernel_rsp).  FMASK
+; clears IF on entry.  We then build the same x64_iframe layout as the
+; interrupt stubs and reuse the common handler/epilogue, so scheduling,
+; TLS (FS base), FPU state and return-to-ring-3 behave identically.
+;
+; RCX and R11 are architecturally clobbered by SYSCALL (return RIP and
+; RFLAGS); their user values are not part of the Linux syscall ABI.
+; ---------------------------------------------------------------------------
+[GLOBAL syscall_entry]
+syscall_entry:
+    mov   [rel g_syscall_user_rsp], rsp
+    mov   rsp, [rel g_syscall_kernel_rsp]
+    push  qword 0x23              ; user SS
+    push  qword [rel g_syscall_user_rsp]
+    push  r11                     ; user RFLAGS
+    push  qword 0x1b              ; user CS
+    push  rcx                     ; return RIP
+    push  qword 0                 ; error code (unused)
+    push  qword 0x80              ; syscall vector
+    jmp   syscall_common
 
 %macro ISR_COMMON 0
     push rax
@@ -42,19 +70,25 @@ section .text
     cli
     mov rsp, rbp
 
-    ; TLS: install the FS base of the thread we are about to resume, but
-    ; only when the target frame lives in ring 3 (kernel frames keep the
-    ; kernel's own FS base of 0). GPRs are still on the stack here, so
-    ; rax/rcx/rdx are free scratch.
+    ; TLS: install the FS base of the thread we are about to resume.
+    ; GPRs are still on the stack here, so rax/rcx/rdx are free scratch.
     cmp   qword [g_sched_next_sp], 0
     jne   .fs_from_next
-    mov   rax, [g_user_fsbase]
-    jmp   .fs_check_ring
-.fs_from_next:
-    mov   rax, [g_sched_next_fsbase]
-.fs_check_ring:
+    ; No handoff: the frame returns to itself, so its own ring decides.
+    ; Kernel frames keep the kernel's FS base and nothing is written.
     test qword [rbp + 18*8], 3         ; iframe.cs offset: ring bits
     jz    .fs_skip
+    mov   rax, [g_user_fsbase]
+    jmp   .fs_write
+.fs_from_next:
+    ; Handoff: the frame being resumed is the TARGET one, not the frame we
+    ; are leaving. Testing [rbp] here used the outgoing ring, so a blocking
+    ; syscall (ring 0) yielding to a user thread skipped the write and left
+    ; the target running on the previous thread's FS base -- a TLS program
+    ; such as nano or tcc then faults on its next errno access. The target
+    ; thread's own base is authoritative, and kernel threads carry 0.
+    mov   rax, [g_sched_next_fsbase]
+.fs_write:
     push rcx
     push rdx
     mov   rcx, 0C0000100h              ; IA32_FS_BASE
@@ -188,6 +222,12 @@ ISR_DEF i
 isr_common:
     ISR_COMMON
 
+; Same save/handler/restore body for the SYSCALL entry.  The frame on the
+; stack already has the CPU-style tail (SS, RSP, RFLAGS, CS, RIP, err, vec),
+; so the macro cannot tell the two entry paths apart.
+syscall_common:
+    ISR_COMMON
+
 ; --- Per-vector stub address table (0 .. 255) -------------------------------
 ; The C IDT installer gates every vector to its own stub, so a vector's
 ; number in the pushed frame always matches the gate that delivered it.
@@ -218,6 +258,14 @@ g_user_fsbase:
     dq 0
 [GLOBAL g_sched_next_fsbase]
 g_sched_next_fsbase:
+    dq 0
+
+; Scratch slot for the user RSP between SYSCALL and the push that records it
+; in the iframe.  Single CPU: the entry path has IF clear from FMASK before
+; this is written, so nothing can observe a torn value.  Per-thread kernel
+; stack selection stays in g_syscall_kernel_rsp (TSS.RSP0 mirror).
+[GLOBAL g_syscall_user_rsp]
+g_syscall_user_rsp:
     dq 0
 
 ; x87/SSE images used by the handoff above: g_user_fpu_area is the image the

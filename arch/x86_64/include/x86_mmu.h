@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/arch/x86_64/include/x86_mmu.h
+ * Description: write-through
+ * Added: 2026-10-17
+ */
 #ifndef ARCH_X86_64_MMU_H
 #define ARCH_X86_64_MMU_H
 

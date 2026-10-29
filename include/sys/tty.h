@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/include/sys/tty.h
+ * Description: NEWOS headers interface
+ * Added: 2026-10-17
+ */
 #ifndef TTY_H
 #define TTY_H
 

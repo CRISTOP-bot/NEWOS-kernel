@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/include/drivers/serial_16550.h
+ * Description: Standard 16550 UART registers (offsets from base)
+ * Added: 2026-10-17
+ */
 #ifndef DRIVERS_SERIAL_H
 #define DRIVERS_SERIAL_H
 

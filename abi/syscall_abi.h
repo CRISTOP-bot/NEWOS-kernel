@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/abi/syscall_abi.h
+ * Description: Forwarding shim.
+ * Added: 2026-10-17
+ */
 /* Forwarding shim.
  *
  * The single source of truth for the user/kernel syscall ABI is

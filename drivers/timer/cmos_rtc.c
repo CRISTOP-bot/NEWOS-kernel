@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/drivers/timer/cmos_rtc.c
+ * Description: PC CMOS RTC. The update-in-progress flag (register 0x0A, bit 7) gates
+ * Added: 2026-10-17
+ */
 #include <drivers/cmos_rtc.h>
 #include <core/core_printk.h>
 #include <x86_io.h>

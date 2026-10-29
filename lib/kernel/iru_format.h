@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/lib/kernel/iru_format.h
+ * Description: Internal single-character output callback used by vsnformat.
+ * Added: 2026-10-17
+ */
 #ifndef LIBK_FORMAT_H
 #define LIBK_FORMAT_H
 

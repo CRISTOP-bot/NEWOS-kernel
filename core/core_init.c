@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/core/core_init.c
+ * Description: -------------------------------------------------------------------------
+ * Added: 2026-10-17
+ */
 #include <core/core_printk.h>
 #include <core/core_panic.h>
 #include <mm/mm_pmm.h>
@@ -5,6 +11,7 @@
 #include <fs/vfs.h>
 #include <ipc/ipc.h>
 #include <core/core_bootinfo.h>
+#include <core/core_console.h>
 #include <mm/mm_debug.h>
 #include <core/core.h>
 #include <drivers/qemu_debug.h>
@@ -132,7 +139,12 @@ static int ktest_procfs(void)
         !strstr(buf, NEWOS_VERSION))
         return -1;
 
-    if (read_vfs_text("/proc/cmdline", buf, sizeof(buf)) < 0)
+    n = read_vfs_text("/proc/cmdline", buf, sizeof(buf));
+    if (n < 0)
+        return -1;
+    /* The automated suite boots with test_mode=1; verify that /proc really
+     * exposes the kernel-owned copy instead of an empty or dangling string. */
+    if (boot_cmdline_has("test_mode=1") && !strstr(buf, "test_mode=1"))
         return -1;
 
     n = read_vfs_text("/proc/uptime", buf, sizeof(buf));
@@ -246,6 +258,62 @@ static int ktest_pipe(void)
     return 0;
 }
 
+static int ktest_console_grab(void)
+{
+    u8 buf[8];
+
+    /* A second owner must be refused while the first holds the keyboard. */
+    if (core_console_kbd_grab(999, 1) != 0)
+        return -1;
+    if (core_console_kbd_grab(1000, 1) == 0)
+        return -1;
+
+    core_console_kbd_push('G');
+    core_console_kbd_push('U');
+    core_console_kbd_push('I');
+    if (core_console_kbd_gui_read(buf, sizeof(buf)) != 3 ||
+        buf[0] != 'G' || buf[1] != 'U' || buf[2] != 'I')
+        return -1;
+    if (core_console_kbd_gui_read(buf, sizeof(buf)) != 0)
+        return -1;
+
+    /* Releasing on behalf of an unrelated pid must not steal the session. */
+    core_console_kbd_release_if(1000);
+    core_console_kbd_push('X');
+    if (core_console_kbd_gui_read(buf, sizeof(buf)) != 1 || buf[0] != 'X')
+        return -1;
+
+    /* The real owner can release, and the private queue is discarded. */
+    core_console_kbd_release_if(999);
+    if (core_console_kbd_grab(1000, 1) != 0)
+        return -1;
+    core_console_kbd_release_if(1000);
+    if (core_console_kbd_gui_read(buf, sizeof(buf)) != 0)
+        return -1;
+
+    return 0;
+}
+
+static int ktest_console_fb_gui(void)
+{
+    if (core_console_fb_gui_active())
+        return -1;
+    if (core_console_fb_gui(999, 1) != 0)
+        return -1;
+    if (!core_console_fb_gui_active())
+        return -1;
+    if (core_console_fb_gui(1000, 1) == 0)
+        return -1;                  /* a second owner must be refused */
+    core_console_fb_gui_release_if(1000);
+    if (!core_console_fb_gui_active())
+        return -1;                  /* unrelated pid cannot release */
+    if (core_console_fb_gui(999, 0) != 0)
+        return -1;
+    if (core_console_fb_gui_active())
+        return -1;
+    return 0;
+}
+
 static int ktest_bitmap(void)
 {
     size_t map[BITMAP_WORDS(64)];
@@ -283,6 +351,8 @@ static const struct ktest ktests[] = {
     { "heap-rw",   ktest_heap_rw    },
     { "pmm-alloc", ktest_pmm_alloc_free },
     { "pipe",      ktest_pipe       },
+    { "kbd-grab",  ktest_console_grab },
+    { "fbcon-gui", ktest_console_fb_gui },
     { "vfs-tmpfs", ktest_vfs_tmpfs  },
     { "procfs",    ktest_procfs     },
     { "sysfs",     ktest_sysfs      },
@@ -311,25 +381,14 @@ static int cmdline_has_test_mode(void)
     return boot_cmdline_has("test_mode=1");
 }
 
-static int cmdline_has_headless(void)
-{
-    return boot_cmdline_has("headless=1");
-}
-
-static int cmdline_has_gui(void)
-{
-    return boot_cmdline_has("gui=1");
-}
-
 /* -------------------------------------------------------------------------
  * Phase 2: userland bootstrap.
  *
- * BoredOS-style init: reads init= bootloader parameter, spawns the
- * configured init binary, with a fallback chain:
- *   gui=1 → /bin/desktop (default)
- *   init=<path> → user-configured init
- *   fallback → /init (shell)
- *   emergency → /bin/sh
+ * The kernel always enters the interactive shell (/bin/sh, with /init as a
+ * fallback). Session policy belongs to userland: that shell reads the boot
+ * cmdline and starts /bin/desktop for `gui=1`, returning to its prompt when
+ * the graphical session exits. Keeping one bootstrap path means a missing
+ * or crashing desktop can never strand the machine without a shell.
  * ---------------------------------------------------------------------- */
 
 static int s_user_done;
@@ -384,17 +443,26 @@ static void run_userland(u64 arg)
 
 static void boot_userland(void)
 {
-    /* Headless mode: launch shell directly.
-     * Default: /init (interactive shell)
-     * Fallback: /bin/sh (emergency rescue)
-     * If gui=0, skip desktop and use /init directly. */
-    const char *fallback1 = "/init";
-    const char *fallback2 = "/bin/sh";
-    struct process *p = NULL;
+    static const struct {
+        const char *path;
+        const char *name;
+    } chain[] = {
+        { "/bin/sh", "sh" },
+        { "/init",   "init" },
+    };
+    struct process *p;
+    char argv[2][128];
 
-    if (cmdline_has_headless()) {
-        printk("userland: headless mode, launching shell\n");
-        p = process_create_from_vfs(fallback2, "shell");
+    /* Mark this one shell as the boot session so it may open the desktop
+     * described by gui=1. A shell later spawned by the user gets no flag
+     * and therefore behaves as a normal nested shell. */
+    memset(argv, 0, sizeof(argv));
+    strcpy(argv[0], "sh");
+    strcpy(argv[1], "--session");
+
+    for (size_t i = 0; i < sizeof(chain) / sizeof(chain[0]); i++) {
+        printk("userland: launching %s\n", chain[i].path);
+        p = process_create_args(chain[i].path, chain[i].name, 2, argv);
         if (p) {
             p->is_init = 1;
             sched_add_process(p);
@@ -402,50 +470,7 @@ static void boot_userland(void)
             x64_goto_stack(isp, run_userland, (u64)p);
             return;
         }
-    } else if (!cmdline_has_gui() && boot_cmdline_has("gui=") == 0) {
-        /* Default: headless mode when no gui= parameter specified */
-        printk("userland: default headless mode, launching shell\n");
-        p = process_create_from_vfs(fallback2, "shell");
-        if (p) {
-            p->is_init = 1;
-            sched_add_process(p);
-            u64 isp = thread_init_stack();
-            x64_goto_stack(isp, run_userland, (u64)p);
-            return;
-        }
-        printk("userland: shell failed, trying fallback\n");
-    } else {
-        printk("userland: headless mode, launching shell\n");
-        p = process_create_from_vfs(fallback2, "shell");
-        if (p) {
-            p->is_init = 1;
-            sched_add_process(p);
-            u64 isp = thread_init_stack();
-            x64_goto_stack(isp, run_userland, (u64)p);
-            return;
-        }
-    }
-
-    /* Fallback 1: /init */
-    printk("userland: launching %s\n", fallback1);
-    p = process_create_from_vfs(fallback1, "init");
-    if (p) {
-        p->is_init = 1;
-        sched_add_process(p);
-        u64 isp = thread_init_stack();
-        x64_goto_stack(isp, run_userland, (u64)p);
-        return;
-    }
-
-    /* Fallback 2: /bin/sh */
-    printk("userland: %s failed, emergency fallback to /bin/sh\n", fallback1);
-    p = process_create_from_vfs(fallback2, "sh");
-    if (p) {
-        p->is_init = 1;
-        sched_add_process(p);
-        u64 isp = thread_init_stack();
-        x64_goto_stack(isp, run_userland, (u64)p);
-        return;
+        printk("userland: %s failed\n", chain[i].path);
     }
 
     /* Everything failed */

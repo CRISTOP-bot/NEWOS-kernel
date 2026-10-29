@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/process/proc_thread.c
+ * Description: Per-thread kernel stacks and the kernel-side resume context that a user
+ * Added: 2026-10-17
+ */
 #include <process/proc_thread.h>
 #include <process/proc_process.h>
 #include <x86_cpu.h>

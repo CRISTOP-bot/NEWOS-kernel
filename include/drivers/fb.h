@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/include/drivers/fb.h
+ * Description: Linear framebuffer driver (Limine-provided graphics mode).
+ * Added: 2026-10-17
+ */
 #ifndef DRIVERS_FB_H
 #define DRIVERS_FB_H
 

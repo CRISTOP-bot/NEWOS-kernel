@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/arch/x86_64/boot/x86_boot.c
+ * Description: Physical base of the kernel image; the Limine boot path overrides this
+ * Added: 2026-10-17
+ */
 #include <abi/multiboot2.h>
 #include <core/core_bootinfo.h>
 #include <core/core_printk.h>
@@ -16,11 +22,16 @@
 #include <fs/initramfs.h>
 #include <fs/procfs/procfs.h>
 #include <fs/sysfs/sysfs.h>
+#include <fs/fat32.h>
+#include <fs/iso9660.h>
+#include <fs/romfs.h>
 #include <drivers/pit_timer.h>
 #include <drivers/serial_16550.h>
 #include <drivers/ps2.h>
 #include <drivers/cmos_rtc.h>
 #include <drivers/pci.h>
+#include <drivers/ata.h>
+#include <net/net_stack.h>
 #include <x86_vendor.h>
 #include "x86_multiboot2.h"
 
@@ -45,6 +56,7 @@ void kernel_boot_tail(void)
 
     /* Early heap, VFS, filesystems. */
     kheap_init_early();
+    ata_init();                 /* probe the raw disk before /dev mounts */
     vfs_init();
     tmpfs_init();
     devfs_init();
@@ -54,10 +66,21 @@ void kernel_boot_tail(void)
     device_model_init();
     pci_init();
 
+    /* The network stack binds to whatever PCI NIC probed above and
+     * stays dormant otherwise. */
+    net_init();
+
     /* Synthetic kernel trees: mount after the initramfs exists and, for
      * sysfs, after PCI enumeration has populated the device model. */
     procfs_init();
     sysfs_init();
+
+    /* Disk filesystems: whichever format the primary-master ATA disk
+     * carries mounts under its own root (/fat, /iso or /rom); the
+     * superblock/probing picks the owner, the other two refuse quietly. */
+    fat32fs_init();
+    iso9660fs_init();
+    romfsfs_init();
 
     /* System services: the PIT tick drives delays (and later the scheduler);
      * COM1 RX becomes interrupt-driven so the console can read input. */

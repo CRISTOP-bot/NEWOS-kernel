@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/mm/mm_pmm_alloc.c
+ * Description: PMM front end: selects a backend implementation. Uses the bitmap
+ * Added: 2026-10-17
+ */
 #include <mm/mm_pmm.h>
 #include <core/core_printk.h>
 #include <core/core.h>

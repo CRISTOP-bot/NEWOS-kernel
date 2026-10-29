@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/core/core_console.c
+ * Description: Console input is the COM1 receiver: bytes arrive through the
+ * Added: 2026-10-17
+ */
 #include <core/core_console.h>
 #include <core/core_types.h>
 #include <drivers/serial_16550.h>
@@ -20,13 +26,119 @@ static volatile u8 g_kbd_ring[KBD_RING_SIZE];
 static volatile u32 g_kbd_head;
 static volatile u32 g_kbd_tail;
 
+/* Private ring for a foreground graphical session (desktop). */
+static volatile u8 g_gui_ring[KBD_RING_SIZE];
+static volatile u32 g_gui_head;
+static volatile u32 g_gui_tail;
+static volatile int g_gui_grab;
+static volatile int g_gui_owner;
+static volatile int g_fb_gui_owner;
+
 void core_console_kbd_push(u8 c)
 {
-    u32 next = (g_kbd_head + 1) & (KBD_RING_SIZE - 1);
+    u32 next;
+
+    if (g_gui_grab) {
+        next = (g_gui_head + 1) & (KBD_RING_SIZE - 1);
+        if (next != g_gui_tail) {
+            g_gui_ring[g_gui_head] = c;
+            g_gui_head = next;
+        }
+        return;
+    }
+    next = (g_kbd_head + 1) & (KBD_RING_SIZE - 1);
     if (next != g_kbd_tail) {
         g_kbd_ring[g_kbd_head] = c;
         g_kbd_head = next;
     }
+}
+
+int core_console_kbd_grab(int pid, int on)
+{
+    cpu_cli();
+    if (on) {
+        if (g_gui_grab) {
+            cpu_sti();
+            return -1;              /* another process owns the keyboard */
+        }
+        /* Drop keys typed before the GUI was ready: they belong to the
+         * session that is being covered, not to the new full-screen app. */
+        g_kbd_tail = g_kbd_head;
+        g_gui_head = g_gui_tail = 0;
+        g_gui_owner = pid;
+        g_gui_grab = 1;
+        cpu_sti();
+        return 0;
+    }
+    if (!g_gui_grab || g_gui_owner != pid) {
+        cpu_sti();
+        return -1;
+    }
+    g_gui_grab = 0;
+    g_gui_owner = 0;
+    g_gui_head = g_gui_tail = 0;
+    cpu_sti();
+    return 0;
+}
+
+int core_console_kbd_gui_read(u8 *buf, int len)
+{
+    int n = 0;
+
+    if (!buf || len <= 0)
+        return 0;
+    cpu_cli();
+    while (n < len && g_gui_tail != g_gui_head) {
+        buf[n++] = g_gui_ring[g_gui_tail];
+        g_gui_tail = (g_gui_tail + 1) & (KBD_RING_SIZE - 1);
+    }
+    cpu_sti();
+    return n;
+}
+
+void core_console_kbd_release_if(int pid)
+{
+    cpu_cli();
+    if (g_gui_grab && g_gui_owner == pid) {
+        g_gui_grab = 0;
+        g_gui_owner = 0;
+        g_gui_head = g_gui_tail = 0;
+    }
+    cpu_sti();
+}
+
+int core_console_fb_gui(int pid, int on)
+{
+    cpu_cli();
+    if (on) {
+        if (g_fb_gui_owner && g_fb_gui_owner != pid) {
+            cpu_sti();
+            return -1;
+        }
+        g_fb_gui_owner = pid;
+        cpu_sti();
+        return 0;
+    }
+    if (g_fb_gui_owner != pid) {
+        cpu_sti();
+        return -1;
+    }
+    g_fb_gui_owner = 0;
+    cpu_sti();
+    return 0;
+}
+
+int core_console_fb_gui_active(void)
+{
+    return g_fb_gui_owner != 0;
+}
+
+void core_console_fb_gui_release_if(int pid)
+{
+    cpu_cli();
+    if (g_fb_gui_owner == pid)
+        g_fb_gui_owner = 0;
+    cpu_sti();
 }
 
 static int kbd_available(void)

@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/include/process/proc_elf.h
+ * Description: Minimal ELF64 loading. The loader validates a full in-memory image and
+ * Added: 2026-10-17
+ */
 #ifndef KERNEL_ELF_H
 #define KERNEL_ELF_H
 
@@ -11,10 +17,13 @@
 #define ELFCLASS64     2
 #define ELFDATA2LSB    1
 #define ET_EXEC        2
+#define ET_DYN         3
 #define EM_X86_64      62
 #define EV_CURRENT     1
 
 #define PT_LOAD        1
+#define PT_INTERP      3
+#define PT_TLS         7
 
 #define PF_X           0x1
 #define PF_W           0x2

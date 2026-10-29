@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/lib/kernel/iru_list.h
+ * Description: NEWOS library interface
+ * Added: 2026-10-17
+ */
 #ifndef LIBK_LIST_H
 #define LIBK_LIST_H
 

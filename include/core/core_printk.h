@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/include/core/core_printk.h
+ * Description: Kernel log levels; bit 0..3 severity, used by the klog ring buffer.
+ * Added: 2026-10-17
+ */
 #ifndef KERNEL_PRINTK_H
 #define KERNEL_PRINTK_H
 

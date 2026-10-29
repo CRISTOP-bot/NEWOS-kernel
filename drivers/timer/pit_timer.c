@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/drivers/timer/pit_timer.c
+ * Description: 8254 PIT driver (channel 0, IRQ0).
+ * Added: 2026-10-17
+ */
 #include <drivers/pit_timer.h>
 #include <x86_irq.h>
 #include <x86_pic.h>

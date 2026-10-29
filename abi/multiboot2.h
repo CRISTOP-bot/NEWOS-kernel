@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/abi/multiboot2.h
+ * Description: Tag types
+ * Added: 2026-10-17
+ */
 #ifndef KERNEL_MULTIBOOT2_H
 #define KERNEL_MULTIBOOT2_H
 

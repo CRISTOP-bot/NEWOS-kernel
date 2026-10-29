@@ -59,11 +59,20 @@ x64_context_save:
 ; void x64_enter_user(struct thread *t)
 ;   Never returns. Loads the thread's CR3, switches RSP to the prepared
 ;   iretq frame on the thread kernel stack and returns to user mode.
+;
+;   Unlike a scheduler resume (which rebuilds the whole iframe through the
+;   interrupt epilogue), this is the very first entry. iretq restores only
+;   rip/cs/rflags/rsp/ss, so the SysV entry registers must be loaded here or
+;   the first process would see leftover kernel values instead of the
+;   thread_set_user_args() pair. struct x64_iframe places rdi at entry_sp-64
+;   and rsi at entry_sp-56.
 [GLOBAL x64_enter_user]
 x64_enter_user:
     mov  rax, [rdi + 24]        ; t->cr3
     mov  cr3, rax
-    mov  rsp, [rdi + 16]        ; t->entry_sp
+    mov  rsp, [rdi + 16]        ; t->entry_sp (&iframe.rip)
+    mov  rdi, [rsp - 64]        ; iframe.rdi = argc
+    mov  rsi, [rsp - 56]        ; iframe.rsi = argv
     iretq
 
 ; void x64_goto_stack(u64 new_rsp, void (*fn)(u64), u64 arg)

@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/syscall/syscall_posix.c
+ * Description: POSIX extension set for the int $0x80 dispatcher.
+ * Added: 2026-10-17
+ */
 #include <syscall/syscall.h>
 #include <process/proc_process.h>
 #include <mm/mm_usercopy.h>
@@ -5,6 +11,9 @@
 #include <mm/mm_pmm.h>
 #include <mm/mm_heap.h>
 #include <fs/vfs.h>
+#include <fs/devfs.h>
+#include <process/sched.h>
+#include <core/core_console.h>
 #include <ipc/ipc.h>
 #include <core/core.h>
 #include <core/core_time.h>
@@ -639,6 +648,258 @@ static long posix_ftruncate(struct x64_iframe *f, struct process *p)
                ? 0 : SYSCALL_RET_ERROR;
 }
 
+/* ---- chmod / chown / fsync ---------------------------------------------- */
+
+/* Mode changes are recorded on the inode (the VFS does not enforce them yet,
+ * exactly like the existing umask support). Ownership is a single-user
+ * model, so the chown family accepts and discards the ids. */
+static long posix_chmod(struct x64_iframe *f, struct process *p, int by_fd)
+{
+    static char path[512];
+    static char abs[512];
+    struct vfs_inode *in;
+
+    if (by_fd) {
+        struct vfs_file *file = posix_file(p, (int)f->rdi);
+        if (!file || !file->inode)
+            return SYSCALL_RET_ERROR;
+        in = file->inode;
+    } else {
+        if (posix_user_string(path, (const void *)(uintptr_t)f->rdi,
+                              sizeof(path)) != 0)
+            return SYSCALL_RET_ERROR;
+        if (posix_abs(p, path, abs) != 0)
+            return SYSCALL_RET_ERROR;
+        in = vfs_lookup(abs);
+        if (!in)
+            return SYSCALL_RET_ERROR;
+    }
+    in->mode = (in->mode & VFS_MODE_TYPE_MASK) | (u32)(f->rsi & 07777);
+    return 0;
+}
+
+/* ---- readiness: poll(2) / select(2) / pselect6(2) ------------------------ */
+
+#define POSIX_WAIT_MAX_FDS 64
+
+static struct ipc_pipe_fd *posix_pipe_of(struct process *p, int fd)
+{
+    struct ipc_pipe_fd *pf;
+
+    if (!p || fd < 0 || fd >= PROCESS_MAX_FDS || !p->fds[fd].file)
+        return NULL;
+    pf = (struct ipc_pipe_fd *)p->fds[fd].data;
+    if (!pf || pf->magic != IPC_PIPE_FD_MAGIC)
+        return NULL;
+    return pf;
+}
+
+/* Revents for one fd. Regular files never block in the VFS, so they are
+ * reported ready for whatever was asked; the console reports readable only
+ * while bytes are queued (the same ring SYS_READ consumes). */
+static short posix_fd_revents(struct process *p, int fd, short want)
+{
+    struct ipc_pipe_fd *pf;
+
+    if (!p || fd < 0 || fd >= PROCESS_MAX_FDS || !p->fds[fd].file)
+        return NSH_POLLNVAL;
+
+    pf = posix_pipe_of(p, fd);
+    if (pf) {
+        short rev = 0;
+        if (want & NSH_POLLIN) {
+            if (ipc_pipe_avail(pf->pipe) > 0)
+                rev |= NSH_POLLIN;
+            if (pf->is_reader && pf->pipe->writer_count == 0)
+                rev |= NSH_POLLIN | NSH_POLLHUP;
+        }
+        if (want & NSH_POLLOUT) {
+            if (!pf->is_reader) {
+                if (pf->pipe->reader_count == 0)
+                    rev |= NSH_POLLERR | NSH_POLLOUT;
+                else if (ipc_pipe_avail(pf->pipe) < IPC_PIPE_CAPACITY)
+                    rev |= NSH_POLLOUT;
+            }
+        }
+        return rev;
+    }
+
+    if (fd == STDIN_FILENO && devfs_is_serial(p->fds[fd].file)) {
+        short rev = 0;
+        if ((want & NSH_POLLIN) && core_console_rx_available() > 0)
+            rev |= NSH_POLLIN;
+        if (want & NSH_POLLOUT)
+            rev |= NSH_POLLOUT;
+        return rev;
+    }
+
+    return want & (NSH_POLLIN | NSH_POLLOUT);
+}
+
+/* Tick budget for a millisecond timeout; -1 means "wait forever". */
+static u64 posix_timeout_ticks(long ms)
+{
+    u64 hz = core_time_hz();
+
+    if (ms <= 0)
+        return 0;
+    if (ms > 3600000)
+        ms = 3600000;
+    if (!hz)
+        hz = 1000;
+    return (u64)ms * hz / 1000 + 1;
+}
+
+/* Sleep one small slice, yielding to peers. A published handoff returns
+ * straight to the interrupt epilogue (see AGENT.md): the frame re-enters
+ * this syscall when the process is scheduled again. */
+static int posix_wait_slice(struct x64_iframe *f)
+{
+    if (sched_yield(f))
+        return 1;
+    core_time_delay_us(1000);
+    return 0;
+}
+
+static long posix_poll(struct x64_iframe *f, struct process *p)
+{
+    struct nsh_pollfd fds[POSIX_WAIT_MAX_FDS];
+    u64 uptr = f->rdi;
+    u64 count = f->rsi;
+    long timeout = (long)f->rdx;
+    u64 start = core_time_ticks();
+    u64 budget = posix_timeout_ticks(timeout);
+    int infinite = timeout < 0;
+
+    if (!p || count > POSIX_WAIT_MAX_FDS)
+        return SYSCALL_RET_ERROR;
+    if (count && copy_from_user(fds, (const void *)(uintptr_t)uptr,
+                                count * sizeof(fds[0])) != 0)
+        return SYSCALL_RET_ERROR;
+
+    for (;;) {
+        long ready = 0;
+        for (u64 i = 0; i < count; i++) {
+            fds[i].revents = (nsh_u16)posix_fd_revents(p, fds[i].fd,
+                                                       (short)fds[i].events);
+            if (fds[i].revents)
+                ready++;
+        }
+        if (ready > 0 || (!infinite && core_time_ticks() - start >= budget)) {
+            if (count && copy_to_user((void *)(uintptr_t)uptr, fds,
+                                      count * sizeof(fds[0])) != 0)
+                return SYSCALL_RET_ERROR;
+            return ready;
+        }
+        if (posix_wait_slice(f))
+            return 0;
+    }
+}
+
+/* Shared select core: the fd_sets are 1024-bit masks, but NEWOS processes
+ * have PROCESS_MAX_FDS slots, so only the first 64 bits can ever be set. */
+static int posix_select_bits(struct process *p, u64 rbits, u64 wbits,
+                             u64 *rout, u64 *wout, u64 *eout)
+{
+    u64 r = 0, w = 0, e = 0;
+    int ready = 0;
+
+    for (int fd = 0; fd < 64; fd++) {
+        short want = 0;
+        if (rbits & (1ull << fd))
+            want |= NSH_POLLIN;
+        if (wbits & (1ull << fd))
+            want |= NSH_POLLOUT;
+        if (!want)
+            continue;
+        short rev = posix_fd_revents(p, fd, want);
+        if (rev & NSH_POLLNVAL) {
+            e |= 1ull << fd;
+            ready++;
+        } else {
+            if (rev & (NSH_POLLIN | NSH_POLLHUP))
+                r |= 1ull << fd;
+            if (rev & NSH_POLLOUT)
+                w |= 1ull << fd;
+            if (rev & NSH_POLLERR)
+                e |= 1ull << fd;
+            if (rev & (NSH_POLLIN | NSH_POLLOUT | NSH_POLLERR | NSH_POLLHUP))
+                ready++;
+        }
+    }
+    *rout = r;
+    *wout = w;
+    *eout = e;
+    return ready;
+}
+
+static long posix_select_wait(struct x64_iframe *f, struct process *p,
+                              u64 ur, u64 uw, u64 ue, long timeout_ms)
+{
+    u64 rbits = 0, wbits = 0, ebits = 0;
+    u64 start = core_time_ticks();
+    u64 budget = posix_timeout_ticks(timeout_ms);
+    int infinite = timeout_ms < 0;
+
+    if ((ur && copy_from_user(&rbits, (const void *)(uintptr_t)ur, 8) != 0) ||
+        (uw && copy_from_user(&wbits, (const void *)(uintptr_t)uw, 8) != 0) ||
+        (ue && copy_from_user(&ebits, (const void *)(uintptr_t)ue, 8) != 0))
+        return SYSCALL_RET_ERROR;
+
+    for (;;) {
+        u64 ro, wo, eo;
+        int ready = posix_select_bits(p, rbits, wbits, &ro, &wo, &eo);
+        int done = ready > 0 ||
+                   (!infinite && core_time_ticks() - start >= budget);
+
+        if (done) {
+            /* POSIX clears the sets that did not fire. */
+            if ((ur && copy_to_user((void *)(uintptr_t)ur, &ro, 8) != 0) ||
+                (uw && copy_to_user((void *)(uintptr_t)uw, &wo, 8) != 0) ||
+                (ue && copy_to_user((void *)(uintptr_t)ue, &eo, 8) != 0))
+                return SYSCALL_RET_ERROR;
+            return ready;
+        }
+        if (posix_wait_slice(f))
+            return 0;
+    }
+}
+
+static long posix_pselect6(struct x64_iframe *f, struct process *p)
+{
+    long timeout_ms = -1;
+
+    if (f->r8) {                       /* struct timespec *timeout */
+        struct nsh_timespec ts;
+        if (copy_from_user(&ts, (const void *)(uintptr_t)f->r8,
+                           sizeof(ts)) != 0)
+            return SYSCALL_RET_ERROR;
+        if (ts.tv_sec < 0 || ts.tv_nsec < 0)
+            timeout_ms = 0;
+        else
+            timeout_ms = (long)(ts.tv_sec * 1000 +
+                                (ts.tv_nsec + 999999) / 1000000);
+    }
+    return posix_select_wait(f, p, f->rsi, f->rdx, f->r10, timeout_ms);
+}
+
+static long posix_select(struct x64_iframe *f, struct process *p)
+{
+    long timeout_ms = -1;
+
+    if (f->r8) {                       /* struct timeval *timeout */
+        struct nsh_timeval tv;
+        if (copy_from_user(&tv, (const void *)(uintptr_t)f->r8,
+                           sizeof(tv)) != 0)
+            return SYSCALL_RET_ERROR;
+        if (tv.tv_sec < 0 || tv.tv_usec < 0)
+            timeout_ms = 0;
+        else
+            timeout_ms = (long)(tv.tv_sec * 1000 + (tv.tv_usec + 999) / 1000);
+    }
+    return posix_select_wait(f, p, f->rsi, f->rdx, f->r10, timeout_ms);
+}
+
 /* ---- misc ------------------------------------------------------------------ */
 
 static u64 s_rng_state;
@@ -669,11 +930,52 @@ static long posix_getrandom(struct x64_iframe *f, struct process *p)
     return (long)done;
 }
 
+/* readv/writev: static musl's stdio uses writev for buffered output.  The
+ * core READ/WRITE cases already contain the pipe, append and VFS semantics,
+ * so replay each iovec through the dispatcher instead of duplicating them.
+ * The synthetic frame keeps the original user RIP/vector, which makes a
+ * blocking READ/WRITE park correctly and re-enter the original syscall. */
+static long posix_rwv(struct x64_iframe *f, int write_op)
+{
+    u64 iov = (u64)f->rsi;
+    u64 count = (u64)f->rdx;
+    long total = 0;
+
+    if (count > 1024)
+        return SYSCALL_RET_ERROR;
+    for (u64 i = 0; i < count; i++) {
+        u64 pair[2];
+        struct x64_iframe sub;
+        long n;
+
+        if (copy_from_user(pair, (const void *)(uintptr_t)(iov + i * 16),
+                           sizeof(pair)) != 0)
+            return total ? total : SYSCALL_RET_ERROR;
+        if (!pair[1])
+            continue;
+
+        sub = *f;
+        sub.rax = write_op ? SYS_WRITE : SYS_READ;
+        sub.rdi = f->rdi;
+        sub.rsi = pair[0];
+        sub.rdx = pair[1];
+        n = syscall_dispatch(&sub);
+        if (n < 0)
+            return total ? total : n;
+        total += n;
+        if ((u64)n < pair[1])
+            break;
+    }
+    return total;
+}
+
 long syscall_posix(struct x64_iframe *f, u64 nr)
 {
     struct process *p = process_current();
 
     switch (nr) {
+    case SYS_WRITEV:    return posix_rwv(f, 1);
+    case SYS_READV:     return posix_rwv(f, 0);
     /* Memory. */
     case SYS_MMAP:      return posix_mmap(f, p);
     case SYS_MUNMAP:    return posix_munmap(f, p);
@@ -732,6 +1034,13 @@ long syscall_posix(struct x64_iframe *f, u64 nr)
                    ? 0 : SYSCALL_RET_ERROR;
     }
     case SYS_FTRUNCATE: return posix_ftruncate(f, p);
+    case SYS_FSYNC:
+    case SYS_FDATASYNC: return 0;     /* RAM-backed VFS: nothing to flush */
+    case SYS_CHMOD:
+    case SYS_FCHMOD:    return posix_chmod(f, p, nr == SYS_FCHMOD);
+    case SYS_CHOWN:
+    case SYS_FCHOWN:    return 0;     /* single-user model */
+    case SYS_READLINK:  return -22;   /* -EINVAL: the VFS has no symlinks */
 
     /* Identity / process groups. */
     case SYS_GETUID:
@@ -763,13 +1072,14 @@ long syscall_posix(struct x64_iframe *f, u64 nr)
     /* Random. */
     case SYS_GETRANDOM: return posix_getrandom(f, p);
 
-    /* poll with "nothing to report" semantics (no event loops yet). */
-    case SYS_POLL:      return 0;
+    /* Readiness: consoles, pipes and the always-ready VFS files. */
+    case SYS_POLL:      return posix_poll(f, p);
+    case SYS_SELECT:    return posix_select(f, p);
+    case SYS_PSELECT6:  return posix_pselect6(f, p);
 
-    /* Not implemented yet: process plumbing (fork/execve/readlink). */
+    /* Not implemented yet: process plumbing (fork/execve). */
     case SYS_FORK:
     case SYS_EXECVE:
-    case SYS_READLINK:
         printk("syscall_posix: pid %u: unsupported syscall %llu\n",
                p ? (unsigned)p->pid : 0, nr);
         return SYSCALL_RET_ERROR;

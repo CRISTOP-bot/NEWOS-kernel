@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/arch/x86_64/interrupts/x86_pic.c
+ * Description: Legacy 8259 Programmable Interrupt Controller.
+ * Added: 2026-10-17
+ */
 #include <x86_io.h>
 
 /* Legacy 8259 Programmable Interrupt Controller.

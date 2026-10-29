@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/mm/mm_pmm_bitmap.c
+ * Description: Bitmap-backed frame allocator.
+ * Added: 2026-10-17
+ */
 #include <mm/mm_pmm.h>
 #include <core/core_printk.h>
 #include <core/core.h>

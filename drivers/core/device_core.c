@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/drivers/core/device_core.c
+ * Description: Device lifecycle helpers. Buses create device objects with bus_register()
+ * Added: 2026-10-17
+ */
 #include <drivers/drv_core.h>
 #include <mm/mm_heap.h>
 #include <iru_string.h>

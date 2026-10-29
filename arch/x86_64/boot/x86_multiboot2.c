@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/arch/x86_64/boot/x86_multiboot2.c
+ * Description: Parses the multiboot2 info structure handed over by the boot loader and
+ * Added: 2026-10-17
+ */
 #include <abi/multiboot2.h>
 #include <core/core_bootinfo.h>
 #include <core/core_printk.h>

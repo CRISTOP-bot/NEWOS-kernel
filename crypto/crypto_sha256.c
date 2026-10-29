@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/crypto/crypto_sha256.c
+ * Description: SHA-256, FIPS 180-4.
+ * Added: 2026-10-17
+ */
 #include <crypto/crypto.h>
 #include <iru_string.h>
 

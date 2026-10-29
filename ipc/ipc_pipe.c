@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/ipc/ipc_pipe.c
+ * Description: A bare pipe has no open ends: each ipc_pipe_fd_new bumps one.
+ * Added: 2026-10-17
+ */
 #include <ipc/ipc.h>
 #include <mm/mm_heap.h>
 #include <iru_string.h>

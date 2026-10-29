@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/arch/x86_64/cpu/x86_fpu.c
+ * Description: TS clear means the state is always accessible: no #NM trap and no
+ * Added: 2026-10-17
+ */
 #include <x86_cpu.h>
 #include <x86_fpu.h>
 #include <core/core_printk.h>

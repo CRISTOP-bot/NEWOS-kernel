@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/drivers/serial/serial_16550.c
+ * Description: Interrupt-driven receive for COM1: bytes pushed by the RX IRQ handler
+ * Added: 2026-10-17
+ */
 #include <drivers/serial_16550.h>
 #include <x86_io.h>
 #include <x86_irq.h>

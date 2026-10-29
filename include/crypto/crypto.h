@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/include/crypto/crypto.h
+ * Description: Kernel cryptographic layer.
+ * Added: 2026-10-17
+ */
 #ifndef KERNEL_CRYPTO_H
 #define KERNEL_CRYPTO_H
 

@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/process/sched.c
+ * Description: Minimal tick scheduler.
+ * Added: 2026-10-17
+ */
 #include <process/sched.h>
 #include <process/proc_process.h>
 #include <process/proc_thread.h>
@@ -172,12 +178,17 @@ int sched_yield(struct x64_iframe *f)
         return 1;
     struct process *next = sched_pick_next_runnable();
     if (next && next != cur) {
-        /* Only rewind genuine post-`int $0x80` trap frames. Anything
-         * else here means a stale frame reached the scheduler, which
-         * would park a bogus RIP. */
+        /* Only rewind genuine NEWOS syscall frames: `int $0x80` or the
+         * Linux x86-64 `syscall` instruction. Anything else here means a
+         * stale frame reached the scheduler, which would park a bogus RIP.
+         * Both instructions are two bytes and both leave RIP after them. */
         u8 insn[2] = { 0, 0 };
-        if (copy_from_user(insn, (const void *)(f->rip - 2), 2) != 0 ||
-            insn[0] != 0xcd || insn[1] != 0x80) {
+        int is_int80 = 0, is_syscall = 0;
+        if (copy_from_user(insn, (const void *)(f->rip - 2), 2) == 0) {
+            is_int80 = insn[0] == 0xcd && insn[1] == 0x80;
+            is_syscall = insn[0] == 0x0f && insn[1] == 0x05;
+        }
+        if (!is_int80 && !is_syscall) {
             printk("diag: YIELD-REWIND refused for %s/%u: rip=%p rax=%llx vec=%llu bytes=%02x%02x\n",
                    cur->name, (unsigned)cur->pid,
                    (void *)f->rip, f->rax, f->vec, insn[0], insn[1]);
@@ -185,12 +196,11 @@ int sched_yield(struct x64_iframe *f)
             for (;;)
                 cpu_hlt();
         }
-        /* Rewind past the 2-byte `int $0x80` BEFORE parking: resume
-         * must re-enter the syscall from scratch. Parking the live
-         * frame as-is would resume after the trap with rax still
-         * holding the syscall number, so every blocking syscall that
-         * handed off (waitpid, read, sleep) would "return" its own
-         * number instead of the real result. */
+        /* Rewind past the 2-byte instruction BEFORE parking: resume must
+         * re-enter the syscall from scratch. Parking the live frame as-is
+         * would resume after the trap with rax still holding the syscall
+         * number, so every blocking syscall that handed off (waitpid, read,
+         * sleep) would "return" its own number instead of the real result. */
         f->rip -= 2;
         thread_save_entry(&cur->thread, f);
         sched_handoff(next);

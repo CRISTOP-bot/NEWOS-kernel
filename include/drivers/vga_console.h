@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/include/drivers/vga_console.h
+ * Description: VGA 80x25 text-mode console (BIOS/legacy path only; unused and harmless
+ * Added: 2026-10-17
+ */
 #ifndef DRIVERS_VGA_CONSOLE_H
 #define DRIVERS_VGA_CONSOLE_H
 

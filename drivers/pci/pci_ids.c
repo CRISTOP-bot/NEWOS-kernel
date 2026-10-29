@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/drivers/pci/pci_ids.c
+ * Description: Human-readable names for common PCI vendor/device IDs. The AMD (0x1022)
+ * Added: 2026-10-17
+ */
 #include <drivers/pci.h>
 #include <core/core.h>
 

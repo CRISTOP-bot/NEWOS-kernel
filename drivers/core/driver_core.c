@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/drivers/core/driver_core.c
+ * Description: Global registration lists for the device model.
+ * Added: 2026-10-17
+ */
 #include <drivers/drv_core.h>
 #include <mm/mm_heap.h>
 #include <core/core_printk.h>

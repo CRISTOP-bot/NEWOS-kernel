@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/include/core/core_time.h
+ * Description: Kernel time services. Wrapped in core so higher layers (syscall, ...) can
+ * Added: 2026-10-17
+ */
 #ifndef CORE_TIME_H
 #define CORE_TIME_H
 

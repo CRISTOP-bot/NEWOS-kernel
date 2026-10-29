@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/drivers/input/ps2_mouse.c
+ * Description: PS/2 auxiliary mouse (port 2, IRQ12). Standard 3/4-byte packets update a
+ * Added: 2026-10-17
+ */
 #include <drivers/ps2.h>
 #include <core/core_printk.h>
 #include <drivers/fb.h>

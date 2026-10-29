@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/core/core_time.c
+ * Description: Thin wrappers over the 8254 PIT driver.
+ * Added: 2026-10-17
+ */
 #include <core/core_time.h>
 #include <drivers/pit_timer.h>
 #include <drivers/cmos_rtc.h>

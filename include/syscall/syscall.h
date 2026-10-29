@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/include/syscall/syscall.h
+ * Description: System call dispatcher. Runs on the user interrupt frame and returns the
+ * Added: 2026-10-17
+ */
 #ifndef KERNEL_SYSCALL_H
 #define KERNEL_SYSCALL_H
 

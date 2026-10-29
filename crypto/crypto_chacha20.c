@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/crypto/crypto_chacha20.c
+ * Description: ChaCha20 as defined by RFC 8439: 20 rounds, the original DJB constant
+ * Added: 2026-10-17
+ */
 #include <crypto/crypto.h>
 
 /* ChaCha20 as defined by RFC 8439: 20 rounds, the original DJB constant

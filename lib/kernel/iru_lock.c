@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/lib/kernel/iru_lock.c
+ * Description: Interrupt-state tracking for IRQ-safe critical sections.
+ * Added: 2026-10-17
+ */
 #include <iru_lock.h>
 
 /* Interrupt-state tracking for IRQ-safe critical sections.

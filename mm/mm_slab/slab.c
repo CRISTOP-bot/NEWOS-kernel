@@ -1,3 +1,9 @@
+/*
+ * Maintainer: Cristopher Borjas <borjascristopher88@gmail.com>
+ * Source: kernel/mm/mm_slab/slab.c
+ * Description: NEWOS memory-manager module
+ * Added: 2026-10-17
+ */
 #include <mm/mm_slab.h>
 #include <mm/mm_heap.h>
 #include <lib/kernel/iru_lock.h>
