@@ -330,7 +330,6 @@ static int ktest2_syscall(void)
         process_free(child);
         goto fail_back;
     }
-    memset((void *)up, 0, sizeof(int));
     f.rax = SYS_WAITPID;
     f.rdi = (u64)child_pid;
     f.rsi = va;
