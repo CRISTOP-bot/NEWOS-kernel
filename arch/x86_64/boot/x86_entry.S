@@ -147,7 +147,7 @@ long_mode_entry:
 ; the tables. 4 KiB rather than 2 MiB huge pages because PHYS_BASE is 1 MiB:
 ; a huge page ignores its low 21 bits, so aliasing an unaligned base shifts
 ; the whole window by 1 MiB and every fetch faults.
-%define KERNEL_MAP_PTS 32          ; 32 * 2 MiB = 64 MiB of window
+%define KERNEL_MAP_PTS 64          ; 64 * 2 MiB = 128 MiB of window
 
 [BITS 32]
 x64_page_tables_setup:

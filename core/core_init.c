@@ -384,11 +384,13 @@ static int cmdline_has_test_mode(void)
 /* -------------------------------------------------------------------------
  * Phase 2: userland bootstrap.
  *
- * The kernel always enters the interactive shell (/bin/sh, with /init as a
- * fallback). Session policy belongs to userland: that shell reads the boot
- * cmdline and starts /bin/desktop for `gui=1`, returning to its prompt when
- * the graphical session exits. Keeping one bootstrap path means a missing
- * or crashing desktop can never strand the machine without a shell.
+ * The kernel tries /sbin/openrc-init (the OpenRC service manager, present
+ * when the image ships it) and falls back to the interactive shell (/bin/sh,
+ * then /init). Session policy belongs to userland: openrc-init reads
+ * /etc/inittab and starts the console shell with --session, and a plain
+ * shell reads the boot cmdline and starts the desktop itself for `gui=1`.
+ * Keeping the fallback chain means a missing or crashing init can never
+ * strand the machine without a shell.
  * ---------------------------------------------------------------------- */
 
 static int s_user_done;
@@ -446,23 +448,31 @@ static void boot_userland(void)
     static const struct {
         const char *path;
         const char *name;
+        int argc;
     } chain[] = {
-        { "/bin/sh", "sh" },
-        { "/init",   "init" },
+        /* The OpenRC init first when the image ships it: runlevels, service
+         * state and the supervised console are then owned by userland.
+         * Upstream calls this PID 1 /sbin/init, but the NEWOS VFS has no
+         * symlinks, so the real name is what the chain carries. */
+        { "/sbin/openrc-init", "openrc-init", 1 },
+        { "/bin/sh", "sh", 2 },
+        { "/init",   "init", 2 },
     };
     struct process *p;
     char argv[2][128];
 
     /* Mark this one shell as the boot session so it may open the desktop
      * described by gui=1. A shell later spawned by the user gets no flag
-     * and therefore behaves as a normal nested shell. */
+     * and therefore behaves as a normal nested shell. openrc-init takes no
+     * flag: it reads /etc/inittab and hands --session to the console shell. */
     memset(argv, 0, sizeof(argv));
-    strcpy(argv[0], "sh");
     strcpy(argv[1], "--session");
 
     for (size_t i = 0; i < sizeof(chain) / sizeof(chain[0]); i++) {
         printk("userland: launching %s\n", chain[i].path);
-        p = process_create_args(chain[i].path, chain[i].name, 2, argv);
+        strcpy(argv[0], chain[i].name);
+        p = process_create_args(chain[i].path, chain[i].name, chain[i].argc,
+                                argv);
         if (p) {
             p->is_init = 1;
             sched_add_process(p);

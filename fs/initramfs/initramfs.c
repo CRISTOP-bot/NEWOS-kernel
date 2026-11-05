@@ -34,6 +34,10 @@ extern const u8 _binary_splash_bmp_end[];
 extern const u8 _binary_test_ppm_start[];
 extern const u8 _binary_test_ppm_end[];
 
+/* Desktop wallpaper plate (brand/newos-wallpaper.bmp). */
+extern const u8 _binary_wallpaper_bmp_start[];
+extern const u8 _binary_wallpaper_bmp_end[];
+
 #define DECL_BIN(n)                               \
     extern const u8 _binary_##n##_elf_start[];    \
     extern const u8 _binary_##n##_elf_end[];
@@ -45,7 +49,6 @@ DECL_BIN(img)
 DECL_BIN(vid)
 DECL_BIN(about)
 DECL_BIN(newfetch)
-DECL_BIN(desktop)
 DECL_BIN(mkdir)
 DECL_BIN(rmdir)
 DECL_BIN(rm)
@@ -71,8 +74,13 @@ DECL_BIN(find)
 DECL_BIN(sort)
 DECL_BIN(newpkg)
 DECL_BIN(frotz)
+DECL_BIN(doom)
 DECL_BIN(busybox)
 DECL_BIN(glxgears)
+
+/* The NEWOS Win95-style desktop session (installed as /bin/desktop and
+ * started by the OpenRC `desktop` service; see /etc/conf.d/desktop). */
+DECL_BIN(desktop)
 
 /* Host-built static Linux/musl programs from the vendored ports. Both run
  * through the Linux-compatible SYSCALL entry (see ports/tcc and ports/nano). */
@@ -103,6 +111,12 @@ extern const u8 _binary_sample_new_end[];
 extern const u8 _binary_mini_z3_start[];
 extern const u8 _binary_mini_z3_end[];
 
+/* DOOM shareware IWAD for /bin/doom: user/programs/doom/data/doom1.wad ->
+ * _binary_doom1_wad_{start,end}, installed at /usr/share/doom/doom1.wad
+ * (the directory /bin/doom's IWAD search checks first). */
+extern const u8 _binary_doom1_wad_start[];
+extern const u8 _binary_doom1_wad_end[];
+
 /* Shell boot script: user/rootfs/nsh.rc -> _binary_nsh_rc_{start,end}. */
 extern const u8 _binary_nsh_rc_start[];
 extern const u8 _binary_nsh_rc_end[];
@@ -110,6 +124,20 @@ extern const u8 _binary_nsh_rc_end[];
 /* System nano configuration: user/rootfs/nanorc -> /usr/etc/nanorc. */
 extern const u8 _binary_nanorc_start[];
 extern const u8 _binary_nanorc_end[];
+
+/* OpenRC service manager: /sbin/openrc is the runlevel engine,
+ * /sbin/openrc-init the PID 1 that supervises the console, and the rc-*
+ * tools are its operators. Built from user/programs/openrc. */
+DECL_BIN(openrc)
+DECL_BIN(openrc_init)
+DECL_BIN(rc_status)
+DECL_BIN(rc_update)
+DECL_BIN(rc_service)
+
+/* OpenRC configuration tree (/etc/rc.conf, /etc/inittab, /etc/conf.d,
+ * /etc/init.d, /etc/runlevels) packed by scripts/pack-openrc.py. */
+extern const u8 _binary_openrc_rootfs_orcf_start[];
+extern const u8 _binary_openrc_rootfs_orcf_end[];
 
 static const struct {
     const char *name;
@@ -124,7 +152,6 @@ static const struct {
     BIN(vid)
     BIN(about)
     BIN(newfetch)
-    BIN(desktop)
     BIN(mkdir)
     BIN(rmdir)
     BIN(rm)
@@ -150,11 +177,29 @@ static const struct {
     BIN(sort)
     BIN(newpkg)
     BIN(frotz)
+    BIN(doom)
     BIN(busybox)
     BIN(glxgears)
     BIN(nano)
     BIN(tcc)
     BIN(voxel)
+    BIN(desktop)
+};
+
+/* /sbin: the system administration tools, where upstream OpenRC lives. The
+ * VFS names keep upstream's hyphens, so the table is written out instead of
+ * generated from the (underscore-only) blob symbols. */
+static const struct {
+    const char *name;
+    const u8 *start;
+    const u8 *end;
+} sbin_table[] = {
+    { "openrc", _binary_openrc_elf_start, _binary_openrc_elf_end },
+    { "openrc-init", _binary_openrc_init_elf_start,
+      _binary_openrc_init_elf_end },
+    { "rc-status", _binary_rc_status_elf_start, _binary_rc_status_elf_end },
+    { "rc-update", _binary_rc_update_elf_start, _binary_rc_update_elf_end },
+    { "rc-service", _binary_rc_service_elf_start, _binary_rc_service_elf_end },
 };
 
 static void install_blob(const char *path, const u8 *data, size_t len,
@@ -169,6 +214,81 @@ static void install_blob(const char *path, const u8 *data, size_t len,
         vfs_write(f, data, len);
         vfs_close(f);
     }
+}
+
+/* OpenRC configuration tree (scripts/pack-openrc.py). The kernel installs
+ * /etc/{rc.conf,inittab,conf.d,init.d,runlevels} from one blob so the service
+ * manager finds a normal /etc on every boot - including a boot whose PID 1 is
+ * plain nsh, where `openrc` and `rc-status` still have to work.
+ *
+ * Record layout: 'F' (file) or 'D' (directory) type byte, u32 path length,
+ * u32 payload size, path bytes, payload. Every length is checked against the
+ * blob before it is used, so a truncated or corrupt tail stops the walk
+ * instead of writing outside the embedded image. */
+static u32 orcf_u32(const u8 *p)
+{
+    return (u32)p[0] | ((u32)p[1] << 8) | ((u32)p[2] << 16) |
+           ((u32)p[3] << 24);
+}
+
+static void install_rc_tree(const u8 *blob, size_t len)
+{
+    size_t pos = 0, files = 0, dirs = 0;
+
+    if (len < 4 || blob[0] != 'O' || blob[1] != 'R' || blob[2] != 'C' ||
+        blob[3] != 'F') {
+        pr_info("initramfs: no OpenRC configuration tree staged\n");
+        return;
+    }
+    pos = 4;
+    while (pos + 9 <= len) {
+        u8 type = blob[pos];
+        u32 pl = orcf_u32(blob + pos + 1);
+        u32 sz = orcf_u32(blob + pos + 5);
+        char path[512];
+        struct vfs_inode *parent;
+
+        pos += 9;
+        if (pl == 0 || (size_t)pl >= sizeof(path) || pos + pl > len)
+            break;
+        for (u32 i = 0; i < pl; i++)
+            path[i] = (char)blob[pos + i];
+        path[pl] = '\0';
+        if (path[0] != '/')
+            break;
+        pos += pl;
+        if (pos + sz > len)
+            break;
+        if (type == 'D') {
+            vfs_mkdir(path);
+            dirs++;
+        } else if (type == 'F') {
+            /* install_blob() takes a parent node: resolve the directory. */
+            char dir[512];
+            size_t k = 0;
+
+            while (path[k]) {
+                dir[k] = path[k];
+                k++;
+            }
+            dir[k] = '\0';
+            while (k > 1 && dir[k - 1] != '/')
+                k--;
+            if (k > 1)
+                k--;                      /* drop the separator itself */
+            dir[k] = '\0';
+            parent = vfs_lookup(dir);
+            if (parent) {
+                install_blob(path, blob + pos, (size_t)sz, parent);
+                files++;
+            } else {
+                pr_warn("initramfs: rc tree: no parent for %s\n", path);
+            }
+        }
+        pos += sz;
+    }
+    pr_info("initramfs: OpenRC tree: %zu files, %zu directories\n",
+            files, dirs);
 }
 
 void initramfs_init(void)
@@ -187,7 +307,7 @@ void initramfs_init(void)
         "/usr/etc",
         "/usr/share", "/usr/share/doc", "/usr/share/doc/newos",
         "/usr/share/man", "/usr/share/misc", "/usr/share/licenses",
-        "/usr/share/zcode", "/usr/src", "/usr/local",
+        "/usr/share/zcode", "/usr/share/doom", "/usr/src", "/usr/local",
         "/usr/local/bin", "/usr/local/sbin", "/usr/local/lib",
         "/usr/local/share", "/usr/local/etc", "/etc/skel", "/etc/init.d",
         "/etc/opt", "/run/lock", "/var/cache", "/var/cache/newpkg",
@@ -336,6 +456,8 @@ void initramfs_init(void)
         } files[] = {
             { "/etc/splash.bmp", _binary_splash_bmp_start,
               _binary_splash_bmp_end },
+            { "/etc/wallpaper.bmp", _binary_wallpaper_bmp_start,
+              _binary_wallpaper_bmp_end },
             { "/etc/test.ppm", _binary_test_ppm_start,
               _binary_test_ppm_end },
             { "/etc/nsh.rc", _binary_nsh_rc_start,
@@ -344,6 +466,8 @@ void initramfs_init(void)
               _binary_nanorc_end },
             { "/usr/share/zcode/mini.z3", _binary_mini_z3_start,
               _binary_mini_z3_end },
+            { "/usr/share/doom/doom1.wad", _binary_doom1_wad_start,
+              _binary_doom1_wad_end },
         };
         for (size_t i = 0; i < sizeof(files) / sizeof(files[0]); i++) {
             size_t len = (size_t)(files[i].end - files[i].start);
@@ -402,6 +526,35 @@ void initramfs_init(void)
             }
         }
         pr_info("initramfs: installed %zu /bin tools\n", installed);
+    }
+
+    /* /sbin: the service manager and its operators. */
+    {
+        struct vfs_inode *sbin = vfs_lookup("/sbin");
+        size_t installed = 0;
+        if (sbin) {
+            for (size_t i = 0;
+                 i < sizeof(sbin_table) / sizeof(sbin_table[0]); i++) {
+                size_t len =
+                    (size_t)(sbin_table[i].end - sbin_table[i].start);
+                if (!len)
+                    continue;
+                char path[80];
+                strcpy(path, "/sbin/");
+                strcat(path, sbin_table[i].name);
+                install_blob(path, sbin_table[i].start, len, sbin);
+                installed++;
+            }
+        }
+        pr_info("initramfs: installed %zu /sbin tools\n", installed);
+    }
+
+    /* OpenRC configuration tree (empty when the image carries no blob). */
+    {
+        size_t len = (size_t)(_binary_openrc_rootfs_orcf_end -
+                              _binary_openrc_rootfs_orcf_start);
+        if (len)
+            install_rc_tree(_binary_openrc_rootfs_orcf_start, len);
     }
 
     /* `.new` archives staged for live exercises:

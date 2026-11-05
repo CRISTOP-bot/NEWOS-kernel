@@ -43,8 +43,11 @@ extern u64 x64_pd_kernel[512];
 /* Early kernel-image page tables: X64_KMAP_PTS * 2 MiB of window, filled with
  * 4 KiB pages because neither loader guarantees a 2 MiB-aligned physical base
  * (PHYS_BASE is 1 MiB; Limine is only 4 KiB-aligned). Must stay in step with
- * KERNEL_MAP_PTS in x86_entry.S, which reserves and wires the same array. */
-#define X64_KMAP_PTS 32
+ * KERNEL_MAP_PTS in x86_entry.S, which reserves and wires the same array.
+ * 64 tables = 128 MiB: text+rodata+data+bss of the current image (embedded
+ * toolbox, nanorc, the shareware DOOM IWAD) is ~65 MiB and the boot stack
+ * lives at the end of it. */
+#define X64_KMAP_PTS 64
 extern u64 x64_pt_kernel[X64_KMAP_PTS][512];
 extern u64 x64_pdpt_direct[512];
 /* Direct-map page directories: 4 x 512 x 2 MiB covering phys 0 .. 4 GiB.

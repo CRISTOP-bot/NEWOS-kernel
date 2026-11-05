@@ -181,6 +181,13 @@ static void kbd_emit_make(u8 code, int ext)
         case 0x0E:
             core_console_kbd_push(0x7F);   /* DEL: shell deletes back */
             return;
+        case 0x01:
+            /* Escape has no printable form and no shifted variant, so the
+             * layout table cannot express it. Full-screen programs need it
+             * as their only way back (DOOM's control panel, nano's cancel),
+             * so it is emitted directly. */
+            core_console_kbd_push(0x1B);
+            return;
         }
     } else {
         switch (code) {

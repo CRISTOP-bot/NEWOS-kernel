@@ -47,4 +47,7 @@ long fb_blit_rows(u64 x, u64 y, u64 w, u64 h, const u32 *rows);
  * under its previous rectangle. Only meaningful when fb_present(). */
 void fb_mouse_place(int x, int y, int buttons);
 
+/* Scroll the framebuffer console by wheel delta (+ = up, - = down). */
+void fb_mouse_scroll(s8 delta);
+
 #endif

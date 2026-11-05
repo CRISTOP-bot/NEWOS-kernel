@@ -47,7 +47,14 @@
  * The low 47-bit half (< 2^47) belongs to user address spaces; the kernel's
  * half (PML4 indices 256..511) is shared by value in every address space.
  */
-#define KERNEL_IMAGE_SIZE   MiB(64)         /* matches the early 64 MiB mapping */
+#define KERNEL_IMAGE_SIZE   MiB(128)        /* the early image window: X64_KMAP_PTS
+                                             * (x86_mmu.h) = KERNEL_MAP_PTS
+                                             * (x86_entry.S) = 64 tables of 4 KiB
+                                             * pages = 128 MiB. virt_to_phys()
+                                             * stops translating above this, so it
+                                             * has to cover text+rodata+data+bss
+                                             * of the linked image, not just the
+                                             * file-resident part. */
 #define DIRECT_PHYS_BASE    0xfffffe0000000000ull
 #define DIRECT_MAP_SIZE     GiB(4)          /* phys 0 .. 4 GiB direct-mapped */
 

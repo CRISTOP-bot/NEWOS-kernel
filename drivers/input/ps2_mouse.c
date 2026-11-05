@@ -258,8 +258,16 @@ static void mouse_packet(void)
     g_mouse_buttons = (b0 & 0x07) | extra_buttons;
     g_mouse_seq++;
     ev_push((s16)g_px, (s16)g_py, (u8)g_mouse_buttons, (s8)wheel);
-    if (fb_present())
+    if (fb_present()) {
         fb_mouse_place(g_px, g_py, g_mouse_buttons);
+        if (wheel) {
+            int sc = (int)wheel;
+            /* Intellimouse wheel: positive = wheel UP (scroll text UP); 
+             * fb_mouse_scroll uses positive delta = scroll text DOWN.
+             * So invert. */
+            fb_mouse_scroll((s8)(-sc));
+        }
+    }
     else
         vga_mouse_place(g_mouse_x, g_mouse_y, g_mouse_buttons);
 }
