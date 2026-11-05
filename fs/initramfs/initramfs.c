@@ -78,10 +78,6 @@ DECL_BIN(doom)
 DECL_BIN(busybox)
 DECL_BIN(glxgears)
 
-/* The NEWOS Win95-style desktop session (installed as /bin/desktop and
- * started by the OpenRC `desktop` service; see /etc/conf.d/desktop). */
-DECL_BIN(desktop)
-
 /* Host-built static Linux/musl programs from the vendored ports. Both run
  * through the Linux-compatible SYSCALL entry (see ports/tcc and ports/nano). */
 DECL_BIN(nano)
@@ -183,7 +179,6 @@ static const struct {
     BIN(nano)
     BIN(tcc)
     BIN(voxel)
-    BIN(desktop)
 };
 
 /* /sbin: the system administration tools, where upstream OpenRC lives. The
