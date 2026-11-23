@@ -124,6 +124,16 @@
 #define SYS_WIFI_DISCONNECT 476 /* -> 0 */
 #define SYS_NET_DNS     477  /* rdi=name rsi=ips rdx=max -> count */
 
+/* Audio vendor block (478+): userland PCM playback via the HDA driver.
+ * FIXED FORMAT for v1: 48000 Hz, stereo, 16-bit signed little-endian. */
+#define SYS_AUDIO_OPEN  478  /* -> handle (>=0) or -1 (no codec/buffer) */
+#define SYS_AUDIO_WRITE 479  /* rdi=handle rsi=pcm rdx=bytes -> bytes played */
+#define SYS_AUDIO_CLOSE 480  /* rdi=handle -> 0 */
+#define AUDIO_RATE      48000u
+#define AUDIO_CHANNELS  2u
+#define AUDIO_BITS      16u
+#define AUDIO_BUF_BYTES (48u * 1024u)   /* 0.25 s @ 48 kHz stereo 16-bit */
+
 /* SEEK_* for SYS_LSEEK (rdi=fd, rsi=offset, rdx=whence; returns new pos). */
 #define SEEK_SET 0
 #define SEEK_CUR 1

@@ -1194,6 +1194,22 @@ long syscall_dispatch(struct x64_iframe *f)
         break;
     }
 
+    /* --- audio -------------------------------------------------------- */
+    case SYS_AUDIO_OPEN:
+        ret = audio_open();
+        break;
+
+    case SYS_AUDIO_WRITE:
+        if (!p)
+            break;
+        ret = audio_play((long)f->rdi, (const void *)(uintptr_t)f->rsi,
+                         (u32)f->rdx);
+        break;
+
+    case SYS_AUDIO_CLOSE:
+        ret = audio_close((long)f->rdi);
+        break;
+
     case SYS_EXIT:
     case SYS_EXIT_GROUP:
         if (!p) {

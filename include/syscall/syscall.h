@@ -37,4 +37,12 @@ long fb_blit_rows(u64 x, u64 y, u64 w, u64 h, const u32 *rows);
 /* PS/2 mouse backend (drivers/input/ps2_mouse.c), same layering reason. */
 void ps2_mouse_get(u64 *seq, int *x, int *y, int *buttons, int *wheel);
 
+/* Audio backend (drivers/audio/audio_backend.c), same layering reason.
+ * Owns one contiguous DMA bounce buffer and exposes one-shot PCM playback
+ * to the syscall layer without importing driver headers there. */
+int  audio_present(void);
+long audio_open(void);                              /* -> handle or -1 */
+long audio_play(long handle, const void *user_pcm, u32 bytes);
+long audio_close(long handle);
+
 #endif

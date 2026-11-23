@@ -82,6 +82,8 @@ DECL_BIN(curl)
 DECL_BIN(ifconfig)
 DECL_BIN(nslookup)
 DECL_BIN(wifi)
+DECL_BIN(beep)
+DECL_BIN(quake2)
 
 /* Host-built static Linux/musl programs from the vendored ports. Both run
  * through the Linux-compatible SYSCALL entry (see ports/tcc and ports/nano). */
@@ -184,6 +186,8 @@ static const struct {
     BIN(ifconfig)
     BIN(nslookup)
     BIN(wifi)
+    BIN(beep)
+    BIN(quake2)
     BIN(doom)
     BIN(busybox)
     BIN(glxgears)
