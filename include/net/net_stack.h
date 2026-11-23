@@ -57,11 +57,47 @@ int net_icmp_ping(u32 dst, const void *payload, u32 len,
 u32 net_ip_gw(void);
 u32 net_ip_addr(void);
 
+/* Interface state getters + setter (SYS_NET_INFO / SYS_NET_SETIP). */
+u32 net_ip_local(void);
+u32 net_ip_netmask(void);
+u32 net_ip_gateway(void);
+u32 net_ip_dns_server(void);
+void net_addr_set(u32 ip, u32 mask, u32 gw, u32 dns);
+void net_mac_get(u8 mac[6]);
+
 /* Nonzero when a NIC is up and the stack is live. */
 int net_up(void);
 
 /* Rebind the stack onto a NIC by registry name (ktests exercise each
  * connected adapter this way; the ARP cache is flushed by the switch). */
 int net_start_nic(const char *name);
+
+/* --- socket / transport API (kernel side) -------------------------------- */
+
+#define NET_SOCK_TCP 0
+#define NET_SOCK_UDP 1
+
+/* Per-process socket handles. Each call takes the caller's pid so a
+ * handle cannot be used by another process. Return values are >= 0 on
+ * success and -1 on error. */
+int net_sock_open(int type, int owner);
+int net_sock_connect(int handle, int owner, u32 ip, u16 port,
+                     u32 timeout_ms);
+int net_sock_bind(int handle, int owner, u16 port);
+int net_sock_send(int handle, int owner, const void *buf, u32 len,
+                  u32 timeout_ms);
+int net_sock_recv(int handle, int owner, void *buf, u32 len,
+                  u32 timeout_ms);
+int net_sock_close(int handle, int owner);
+
+/* DHCP: DISCOVER/OFFER/REQUEST/ACK on the active NIC, then apply the
+ * lease. Returns 0 when the interface is configured. */
+int net_dhcp_config(u32 timeout_ms);
+
+/* ICMP echo with an RTT measured in PIT ticks converted to microseconds. */
+int net_ping(u32 ip, u32 timeout_ms, u32 *rtt_us);
+
+/* Stub resolver over UDP: A records only, returns 0 and *ip in host order. */
+int net_dns_resolve(const char *name, u32 *ip, u32 timeout_ms);
 
 #endif

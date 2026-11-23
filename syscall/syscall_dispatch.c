@@ -19,6 +19,9 @@
 #include <core/core_time.h>
 #include <core/core_version.h>
 #include <abi/syscall_abi.h>
+#include <net/net_stack.h>
+#include <net/wifi.h>
+#include <drivers/nic.h>
 #include <iru_string.h>
 #include <x86_cpu.h>
 
@@ -1001,6 +1004,187 @@ long syscall_dispatch(struct x64_iframe *f)
         int n = core_console_kbd_gui_read(buf, (int)len);
         if (n > 0 &&
             copy_to_user((void *)(uintptr_t)f->rdi, buf, (size_t)n) != 0)
+            break;
+        ret = n;
+        break;
+    }
+
+    /* --- network + wireless ------------------------------------------- */
+
+    case SYS_NET_SOCKET:
+        if (!p)
+            break;
+        ret = net_sock_open((int)f->rdi, (int)p->pid);
+        break;
+
+    case SYS_NET_CONNECT:
+        if (!p)
+            break;
+        ret = net_sock_connect((int)f->rdi, (int)p->pid, (u32)f->rsi,
+                               (u16)f->rdx, (u32)f->r10);
+        break;
+
+    case SYS_NET_BIND:
+        if (!p)
+            break;
+        ret = net_sock_bind((int)f->rdi, (int)p->pid, (u16)f->rsi);
+        break;
+
+    case SYS_NET_SEND: {
+        static u8 nbuf[2048];
+        u32 len = (u32)f->rdx;
+
+        if (!p)
+            break;
+        if (len > sizeof(nbuf))
+            len = sizeof(nbuf);
+        if (copy_from_user(nbuf, (const void *)(uintptr_t)f->rsi, len) != 0)
+            break;
+        ret = net_sock_send((int)f->rdi, (int)p->pid, nbuf, len,
+                            (u32)f->r10);
+        break;
+    }
+
+    case SYS_NET_RECV: {
+        static u8 nbuf[2048];
+        u32 len = (u32)f->rdx;
+        long n;
+
+        if (!p || len == 0)
+            break;
+        if (len > sizeof(nbuf))
+            len = sizeof(nbuf);
+        n = net_sock_recv((int)f->rdi, (int)p->pid, nbuf, len,
+                          (u32)f->r10);
+        if (n > 0 &&
+            copy_to_user((void *)(uintptr_t)f->rsi, nbuf, (size_t)n) != 0)
+            break;
+        ret = n;
+        break;
+    }
+
+    case SYS_NET_CLOSE:
+        if (!p)
+            break;
+        ret = net_sock_close((int)f->rdi, (int)p->pid);
+        break;
+
+    case SYS_NET_DHCP:
+        ret = net_dhcp_config((u32)f->rdi ? (u32)f->rdi : 5000);
+        break;
+
+    case SYS_NET_INFO: {
+        struct nsh_netinfo ni;
+        const struct net_nic *nic = net_nic_active();
+
+        memset(&ni, 0, sizeof(ni));
+        ni.ip = net_ip_local();
+        ni.mask = net_ip_netmask();
+        ni.gw = net_ip_gateway();
+        ni.dns = net_ip_dns_server();
+        net_mac_get(ni.mac);
+        ni.up = (nsh_u8)(net_up() ? 1 : 0);
+        ni.link = (nsh_u8)(wifi_up() ? 1 : 0);
+        if (wifi_up())
+            memcpy(ni.ifname, "wlan0", 6);
+        else if (nic && nic->name)
+            strncpy(ni.ifname, nic->name, sizeof(ni.ifname) - 1);
+        else
+            memcpy(ni.ifname, "eth0", 5);
+        if (copy_to_user((void *)(uintptr_t)f->rdi, &ni, sizeof(ni)) != 0)
+            break;
+        ret = 0;
+        break;
+    }
+
+    case SYS_NET_SETIP:
+        net_addr_set((u32)f->rdi, (u32)f->rsi, (u32)f->rdx, 0);
+        ret = 0;
+        break;
+
+    case SYS_NET_PING: {
+        u32 rtt = 0;
+        if (net_ping((u32)f->rdi, (u32)f->rsi ? (u32)f->rsi : 1000,
+                     &rtt) != 0)
+            break;
+        ret = (long)rtt;
+        break;
+    }
+
+    case SYS_WIFI_SCAN: {
+        struct wifi_ap aps[16];
+        int max = (int)f->rsi;
+        int n;
+
+        if (max <= 0)
+            break;
+        if (max > (int)(sizeof(aps) / sizeof(aps[0])))
+            max = (int)(sizeof(aps) / sizeof(aps[0]));
+        n = wifi_scan(aps, max);
+        if (n < 0)
+            break;
+        if (n > 0 &&
+            copy_to_user((void *)(uintptr_t)f->rdi, aps,
+                         (size_t)n * sizeof(aps[0])) != 0)
+            break;
+        ret = n;
+        break;
+    }
+
+    case SYS_WIFI_CONNECT: {
+        char ssid[NSH_NET_SSID + 1];
+        char pass[WIFI_PASS_MAX + 1];
+
+        pass[0] = '\0';
+        if (copy_user_string(ssid, (const void *)(uintptr_t)f->rdi,
+                             sizeof(ssid)) != 0)
+            break;
+        if (f->rsi && copy_user_string(pass,
+                                       (const void *)(uintptr_t)f->rsi,
+                                       sizeof(pass)) != 0)
+            break;
+        ret = wifi_connect(ssid, f->rsi ? pass : NULL,
+                           (u32)f->rdx ? (u32)f->rdx : 5000);
+        break;
+    }
+
+    case SYS_WIFI_STATUS: {
+        struct wifi_status st;
+        if (wifi_status(&st) != 0)
+            break;
+        if (copy_to_user((void *)(uintptr_t)f->rdi, &st, sizeof(st)) != 0)
+            break;
+        ret = 0;
+        break;
+    }
+
+    case SYS_WIFI_DISCONNECT:
+        ret = wifi_disconnect();
+        break;
+
+    case SYS_NET_DNS: {
+        char name[128];
+        u32 ips[8];
+        int n;
+
+        if (copy_user_string(name, (const void *)(uintptr_t)f->rdi,
+                             sizeof(name)) != 0)
+            break;
+        n = (int)f->rdx;
+        if (n <= 0)
+            break;
+        if (n > (int)(sizeof(ips) / sizeof(ips[0])))
+            n = (int)(sizeof(ips) / sizeof(ips[0]));
+        int rc;
+
+        if (n > (int)(sizeof(ips) / sizeof(ips[0])))
+            n = (int)(sizeof(ips) / sizeof(ips[0]));
+        rc = net_dns_resolve(name, ips, 3000);
+        if (rc != 0)
+            break;
+        n = 1;
+        if (copy_to_user((void *)(uintptr_t)f->rsi, ips,
+                         (size_t)n * sizeof(ips[0])) != 0)
             break;
         ret = n;
         break;

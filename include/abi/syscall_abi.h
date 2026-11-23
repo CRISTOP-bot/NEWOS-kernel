@@ -106,6 +106,24 @@
 #define SYS_KBD_READ   461   /* rdi=buf, rsi=len; non-blocking bytes */
 #define SYS_CONSOLE_GUI 462  /* rdi=1 suspend fbcon for a framebuffer GUI */
 
+/* Network + wireless vendor block (463+). Handles are small integers owned
+ * by the calling process; they are not file descriptors. */
+#define SYS_NET_SOCKET  463  /* rdi=type (0 TCP, 1 UDP) -> handle */
+#define SYS_NET_CONNECT 464  /* rdi=sock rsi=ip rdx=port r10=timeout_ms */
+#define SYS_NET_BIND    465  /* rdi=sock rsi=port -> 0 */
+#define SYS_NET_SEND    466  /* rdi=sock rsi=buf rdx=len r10=timeout_ms */
+#define SYS_NET_RECV    467  /* rdi=sock rsi=buf rdx=len r10=timeout_ms */
+#define SYS_NET_CLOSE   468  /* rdi=sock -> 0 */
+#define SYS_NET_DHCP    469  /* rdi=timeout_ms -> 0 */
+#define SYS_NET_INFO    470  /* rdi=struct nsh_netinfo * -> 0 */
+#define SYS_NET_SETIP   471  /* rdi=ip rsi=mask rdx=gw -> 0 */
+#define SYS_NET_PING    472  /* rdi=ip rsi=timeout_ms -> rtt_us or -1 */
+#define SYS_WIFI_SCAN   473  /* rdi=aps rsi=max -> count */
+#define SYS_WIFI_CONNECT 474 /* rdi=ssid rsi=pass rdx=timeout_ms -> 0 */
+#define SYS_WIFI_STATUS 475  /* rdi=struct nsh_wifi_status * -> 0 */
+#define SYS_WIFI_DISCONNECT 476 /* -> 0 */
+#define SYS_NET_DNS     477  /* rdi=name rsi=ips rdx=max -> count */
+
 /* SEEK_* for SYS_LSEEK (rdi=fd, rsi=offset, rdx=whence; returns new pos). */
 #define SEEK_SET 0
 #define SEEK_CUR 1
@@ -387,5 +405,58 @@ struct nsh_winsize {
     nsh_u16 ws_xpixel;
     nsh_u16 ws_ypixel;
 };
+
+/* ---- network + wireless ------------------------------------------------ */
+
+#define NSH_NET_IFNAME 16
+#define NSH_NET_SSID   32
+
+#define NSH_NET_TCP 0
+#define NSH_NET_UDP 1
+
+/* SYS_NET_INFO: one snapshot of the active interface. Addresses are in
+ * host byte order so userland never byte-swaps for printing or the DNS
+ * socket API. `up` is nonzero when a NIC is bound and the stack is live. */
+struct nsh_netinfo {
+    nsh_u32 ip;
+    nsh_u32 mask;
+    nsh_u32 gw;
+    nsh_u32 dns;
+    nsh_u8  mac[6];
+    nsh_u8  up;
+    nsh_u8  link;                 /* 0 ethernet, 1 wifi association */
+    char    ifname[NSH_NET_IFNAME];
+};
+
+/* SYS_WIFI_SCAN entry. `security`: 0 open, 1 WPA2-PSK. */
+struct nsh_wifi_ap {
+    char    ssid[NSH_NET_SSID];
+    nsh_u8  bssid[6];
+    nsh_u8  security;
+    nsh_u8  connected;
+    nsh_u16 channel;
+    nsh_s32 rssi;                 /* dBm, negative */
+};
+
+/* SYS_WIFI_STATUS: association state + the addresses DHCP handed out. */
+struct nsh_wifi_status {
+    char    ssid[NSH_NET_SSID];
+    char    ifname[NSH_NET_IFNAME];
+    nsh_u8  bssid[6];
+    nsh_u8  security;
+    nsh_u8  connected;
+    nsh_u8  reserved;
+    nsh_u16 channel;
+    nsh_s32 rssi;
+    nsh_u32 ip;
+    nsh_u32 gw;
+};
+
+typedef char nsh_abi_netinfo_size_must_be_40[
+    sizeof(struct nsh_netinfo) == 40 ? 1 : -1];
+typedef char nsh_abi_wifi_ap_size_must_be_48[
+    sizeof(struct nsh_wifi_ap) == 48 ? 1 : -1];
+typedef char nsh_abi_wifi_status_size_must_be_72[
+    sizeof(struct nsh_wifi_status) == 72 ? 1 : -1];
 
 #endif
