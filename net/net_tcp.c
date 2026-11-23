@@ -21,7 +21,7 @@ static u8 tcp_seg[20 + NET_TCP_MSS];
 /* Build a TCP segment (header + optional payload) in the static buffer.
  * Byte 12-13 carry the data offset (4) and flags; window/checksum at
  * the RFC 793 offsets. */
-static void tcp_build(u16 sport, u16 dport, u32 seq, u32 ack, u16 flags,
+static void tcp_build(u32 dst, u16 sport, u16 dport, u32 seq, u32 ack, u16 flags,
                      u16 window, const u8 *payload, u32 len)
 {
     net_put_be16(tcp_seg + 0, sport);
@@ -35,7 +35,7 @@ static void tcp_build(u16 sport, u16 dport, u32 seq, u32 ack, u16 flags,
     if (len)
         memcpy(tcp_seg + 20, payload, len);
     net_put_be32(tcp_seg + 16, 0);
-    net_put_be16(tcp_seg + 16, net_checksum_pseudo(net_ip_local(), net_ip_local(),
+    net_put_be16(tcp_seg + 16, net_checksum_pseudo(net_ip_local(), dst,
                     NET_IP_PROTO_TCP, tcp_seg, 20 + len));
 }
 
@@ -60,7 +60,7 @@ int net_tcp_connect(struct net_socket *s, u32 ip, u16 port, u32 timeout_ms)
     s->snd_wnd = 8192;
     s->tcp_state = NET_TCP_SYN_SENT;
 
-    tcp_build((u16)s->lport, (u16)port, iss, 0, TCP_FLAG_SYN, 8192, 0, 0);
+    tcp_build(ip, (u16)s->lport, (u16)port, iss, 0, TCP_FLAG_SYN, 8192, 0, 0);
     if (net_ip_send(ip, NET_IP_PROTO_TCP, tcp_seg, 20,
                     timeout_ms ? timeout_ms : 5000) != 0)
         return -1;
@@ -81,7 +81,7 @@ int net_tcp_connect(struct net_socket *s, u32 ip, u16 port, u32 timeout_ms)
 
     if (s->tcp_state == NET_TCP_ESTABLISHED) {
         /* Handshake done: send the accepting ACK. */
-        tcp_build((u16)s->lport, (u16)port, s->snd_nxt, s->snd_una,
+        tcp_build(s->rip, (u16)s->lport, (u16)port, s->snd_nxt, s->snd_una,
                   TCP_FLAG_ACK, (u16)s->snd_wnd, 0, 0);
         net_ip_send(s->rip, NET_IP_PROTO_TCP, tcp_seg, 20, 3000);
         established = 1;
@@ -104,7 +104,7 @@ int net_tcp_send(struct net_socket *s, const u8 *buf, u32 len, u32 timeout_ms)
     seg_len = len < NET_TCP_MSS ? len : NET_TCP_MSS;
     seq = s->snd_nxt;
 
-    tcp_build((u16)s->lport, (u16)s->rport, seq, s->snd_una,
+    tcp_build(s->rip, (u16)s->lport, (u16)s->rport, seq, s->snd_una,
               TCP_FLAG_ACK | TCP_FLAG_PSH, (u16)s->snd_wnd, buf, seg_len);
     if (net_ip_send(s->rip, NET_IP_PROTO_TCP, tcp_seg, (u32)(20 + seg_len),
                     timeout_ms ? timeout_ms : 5000) != 0)
@@ -172,7 +172,7 @@ void net_tcp_close(struct net_socket *s)
         return;
     if (s->tcp_state != NET_TCP_ESTABLISHED)
         return;
-    tcp_build((u16)s->lport, (u16)s->rport, s->snd_nxt, s->snd_una,
+    tcp_build(s->rip, (u16)s->lport, (u16)s->rport, s->snd_nxt, s->snd_una,
               TCP_FLAG_ACK | TCP_FLAG_FIN, (u16)s->snd_wnd, 0, 0);
     net_ip_send(s->rip, NET_IP_PROTO_TCP, tcp_seg, 20, 3000);
     s->tcp_state = NET_TCP_FIN_WAIT_1;
@@ -218,7 +218,7 @@ void net_tcp_rx(const u8 *pkt, u32 len, u32 src, u32 dst)
         s->rcv_nxt = seq + 1;
         s->snd_wnd = window;
         s->tcp_state = NET_TCP_ESTABLISHED;
-        tcp_build((u16)s->lport, (u16)s->rport, s->snd_nxt, s->snd_una,
+        tcp_build(s->rip, (u16)s->lport, (u16)s->rport, s->snd_nxt, s->snd_una,
                   TCP_FLAG_ACK, (u16)s->snd_wnd, 0, 0);
         net_ip_send(s->rip, NET_IP_PROTO_TCP, tcp_seg, 20, 3000);
         return;

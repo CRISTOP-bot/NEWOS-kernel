@@ -1167,6 +1167,7 @@ long syscall_dispatch(struct x64_iframe *f)
         u32 ips[8];
         int n;
 
+
         if (copy_user_string(name, (const void *)(uintptr_t)f->rdi,
                              sizeof(name)) != 0)
             break;
@@ -1180,12 +1181,15 @@ long syscall_dispatch(struct x64_iframe *f)
         if (n > (int)(sizeof(ips) / sizeof(ips[0])))
             n = (int)(sizeof(ips) / sizeof(ips[0]));
         rc = net_dns_resolve(name, ips, 3000);
+
         if (rc != 0)
             break;
         n = 1;
         if (copy_to_user((void *)(uintptr_t)f->rsi, ips,
-                         (size_t)n * sizeof(ips[0])) != 0)
+                         (size_t)n * sizeof(ips[0])) != 0) {
+
             break;
+        }
         ret = n;
         break;
     }

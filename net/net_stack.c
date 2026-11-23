@@ -281,7 +281,6 @@ int net_ip_send(u32 dst, u8 proto, const void *payload, u32 len,
 {
     u8 mac[ETH_ALEN];
     u32 hop;
-
     if (!g_up)
         return -1;
     if (dst == 0xFFFFFFFFu || dst == (g_ip_addr | ~g_ip_mask)) {
@@ -587,7 +586,8 @@ u32 net_ip_dns_server(void)
 {
     if (g_ip_dns)
         return g_ip_dns;
-    return (g_ip_gw & g_ip_mask) | 3u;
+    /* Try Google DNS */
+    return NET_IPV4(8, 8, 8, 8);
 }
 
 void net_addr_set(u32 ip, u32 mask, u32 gw, u32 dns)

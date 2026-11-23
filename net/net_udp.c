@@ -29,9 +29,8 @@ static int udp_emit(struct net_socket *s, u32 dst, u16 dport, const u8 *data,
         memcpy(seg + 8, data, len);
 
     {
-        u16 csum = net_checksum_pseudo(s->rip, dst, NET_IP_PROTO_UDP, seg,
+        u16 csum = net_checksum_pseudo(net_ip_local(), dst, NET_IP_PROTO_UDP, seg,
                                       8 + len);
-
         net_put_be16(seg + 6, csum ? csum : 0xFFFF);
     }
     return net_ip_send(dst, NET_IP_PROTO_UDP, seg, (u32)(8 + len), timeout_ms);
@@ -40,13 +39,13 @@ static int udp_emit(struct net_socket *s, u32 dst, u16 dport, const u8 *data,
 int net_udp_sendto(struct net_socket *s, u32 dst, u16 dport, const u8 *data,
                    u32 len, u32 timeout_ms)
 {
+    int rc;
     if (!s || s->type != NET_SOCK_UDP)
         return -1;
     if (len > NET_UDP_MAX - 8)
         return -1;
-    if (udp_emit(s, dst, dport, data, len, timeout_ms) != 0)
-        return -1;
-    return (int)len;
+    rc = udp_emit(s, dst, dport, data, len, timeout_ms);
+    return rc == 0 ? (int)len : -1;
 }
 
 void net_udp_rx(const u8 *pkt, u32 len, u32 src, u32 dst)
@@ -70,10 +69,10 @@ void net_udp_rx(const u8 *pkt, u32 len, u32 src, u32 dst)
 
     if (seglen > NET_UDP_MAX)
         return;
-    if (seglen > len - 8)
+    if (seglen > len)
         return;
 
-    struct net_socket *s = net_sock_find_udp_peer(src, dport, sport);
+    struct net_socket *s = net_sock_find_udp_peer(src, sport, dport);
 
     if (!s || s->udp_len > 0)
         return;                     /* single-datagram socket semantics */
