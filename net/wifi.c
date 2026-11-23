@@ -452,8 +452,10 @@ int wifi_connect(const char *ssid, const char *pass, u32 timeout_ms)
     }
 
     if (net_dhcp_config(timeout_ms) != 0) {
-        net_addr_set(NET_IPV4(10, 0, 3, 15), NET_IPV4(255, 255, 255, 0),
-                     NET_IPV4(10, 0, 3, 2), NET_IPV4(10, 0, 3, 3));
+        /* The virtual radio's e1000 sits on a second QEMU user-net, which
+         * is the same 10.0.2.0/24 SLIRP network with gateway 10.0.2.2.
+         * Use that lease so ICMP/DNS keep routing after association. */
+        net_addr_set(NET_IP_ADDR, NET_IP_MASK, NET_IP_GW, 0);
     }
 
     g_connected = 1;
