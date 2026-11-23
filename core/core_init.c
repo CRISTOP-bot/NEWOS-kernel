@@ -450,13 +450,10 @@ static void boot_userland(void)
         const char *name;
         int argc;
     } chain[] = {
-        /* The OpenRC init first when the image ships it: runlevels, service
-         * state and the supervised console are then owned by userland.
-         * Upstream calls this PID 1 /sbin/init, but the NEWOS VFS has no
-         * symlinks, so the real name is what the chain carries. */
+        /* OpenRC is the sole PID 1: runlevels, service state and the
+         * supervised console are owned by userland. No fallback init
+         * is attempted; if openrc-init is missing the boot fails. */
         { "/sbin/openrc-init", "openrc-init", 1 },
-        { "/bin/sh", "sh", 2 },
-        { "/init",   "init", 2 },
     };
     struct process *p;
     char argv[2][128];
@@ -468,22 +465,20 @@ static void boot_userland(void)
     memset(argv, 0, sizeof(argv));
     strcpy(argv[1], "--session");
 
-    for (size_t i = 0; i < sizeof(chain) / sizeof(chain[0]); i++) {
-        printk("userland: launching %s\n", chain[i].path);
-        strcpy(argv[0], chain[i].name);
-        p = process_create_args(chain[i].path, chain[i].name, chain[i].argc,
-                                argv);
-        if (p) {
-            p->is_init = 1;
-            sched_add_process(p);
-            u64 isp = thread_init_stack();
-            x64_goto_stack(isp, run_userland, (u64)p);
-            return;
-        }
-        printk("userland: %s failed\n", chain[i].path);
+    printk("userland: launching %s\n", chain[0].path);
+    strcpy(argv[0], chain[0].name);
+    p = process_create_args(chain[0].path, chain[0].name, chain[0].argc,
+                            argv);
+    if (p) {
+        p->is_init = 1;
+        sched_add_process(p);
+        u64 isp = thread_init_stack();
+        x64_goto_stack(isp, run_userland, (u64)p);
+        return;
     }
 
-    /* Everything failed */
+    /* OpenRC init failed - no fallback */
+    printk("userland: %s failed, no fallback init available\n", chain[0].path);
     s_phase2_failures = 1;
     printk("=== PHASE 2: FAIL ===\n");
     if (cmdline_has_test_mode())

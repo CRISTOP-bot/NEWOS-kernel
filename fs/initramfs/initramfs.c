@@ -27,7 +27,6 @@ extern const u8 _binary_hello_elf_start[];
 extern const u8 _binary_hello_elf_end[];
 extern const u8 _binary_init_elf_start[];
 extern const u8 _binary_init_elf_end[];
-
 /* Embedded test images for the img viewer (splash.bmp, test.ppm). */
 extern const u8 _binary_splash_bmp_start[];
 extern const u8 _binary_splash_bmp_end[];
@@ -494,7 +493,7 @@ void initramfs_init(void)
         }
     }
 
-    /* /bin/hello (phase-2 test program) and /init (the interactive shell). */
+    /* /bin/hello (phase-2 test program) and /bin/sh (the interactive shell). */
     size_t hello_len = (size_t)(_binary_hello_elf_end - _binary_hello_elf_start);
     size_t init_len = (size_t)(_binary_init_elf_end - _binary_init_elf_start);
     if (hello_len) {
@@ -504,13 +503,10 @@ void initramfs_init(void)
         pr_info("initramfs: installed /bin/hello (%zu bytes)\n", hello_len);
     }
     if (init_len) {
-        struct vfs_inode *root = vfs_root();
         struct vfs_inode *bin = vfs_lookup("/bin");
-        if (root)
-            install_blob("/init", _binary_init_elf_start, init_len, root);
         if (bin)
             install_blob("/bin/sh", _binary_init_elf_start, init_len, bin);
-        pr_info("initramfs: installed /init + /bin/sh (%zu bytes)\n",
+        pr_info("initramfs: installed /bin/sh (%zu bytes)\n",
                 init_len);
     }
 
