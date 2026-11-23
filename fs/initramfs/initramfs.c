@@ -330,6 +330,15 @@ void initramfs_init(void)
     /* Package database home (userspace newpkg registers installs here). */
     vfs_mkdir("/var/lib");
     vfs_mkdir("/var/lib/newpkg");
+    /* Pre-configure the bundled local repository (Debian-style file: source)
+     * so newpkg update/search/install work out of the box. */
+    {
+        static const char repos_conf[] = "file:/etc/newpkg-repo\n";
+        struct vfs_inode *npkg = vfs_lookup("/var/lib/newpkg");
+        if (npkg)
+            install_blob("/var/lib/newpkg/repos.conf",
+                         (const u8 *)repos_conf, sizeof(repos_conf) - 1, npkg);
+    }
 
     /* Classic dotfiles. */
     static const char hostname[] = "newos\n";
