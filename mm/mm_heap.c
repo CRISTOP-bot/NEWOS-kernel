@@ -17,7 +17,7 @@
  * before the package itself is counted.  The complete BusyBox binary adds
  * another ~1.1 MiB, and initramfs duplicates the GNU payload while newpkg
  * extracts it, so the previous 32 MiB arena ran out during boot. */
-#define KHEAP_ARENA_SIZE (48u * 1024u * 1024u)   /* 48 MiB */
+#define KHEAP_ARENA_SIZE (64u * 1024u * 1024u)   /* 64 MiB: 18 MiB Quake PAK + blobs */
 
 static u8 kheap_arena[KHEAP_ARENA_SIZE] __attribute__((aligned(4096)));
 

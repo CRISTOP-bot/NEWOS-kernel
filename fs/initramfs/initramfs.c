@@ -119,6 +119,9 @@ extern const u8 _binary_mini_z3_end[];
  * (the directory /bin/doom's IWAD search checks first). */
 extern const u8 _binary_doom1_wad_start[];
 extern const u8 _binary_doom1_wad_end[];
+/* Quake 2 game data: ports/quake2-newos/baseq2/pak0.pak -> /baseq2/pak0.pak */
+extern const u8 _binary_q2pak0_pak_start[];
+extern const u8 _binary_q2pak0_pak_end[];
 
 /* Shell boot script: user/rootfs/nsh.rc -> _binary_nsh_rc_{start,end}. */
 extern const u8 _binary_nsh_rc_start[];
@@ -317,7 +320,7 @@ void initramfs_init(void)
         "/usr/etc",
         "/usr/share", "/usr/share/doc", "/usr/share/doc/newos",
         "/usr/share/man", "/usr/share/misc", "/usr/share/licenses",
-        "/usr/share/zcode", "/usr/share/doom", "/usr/src", "/usr/local",
+        "/usr/share/zcode", "/usr/share/doom", "/baseq2", "/usr/src", "/usr/local",
         "/usr/local/bin", "/usr/local/sbin", "/usr/local/lib",
         "/usr/local/share", "/usr/local/etc", "/etc/skel", "/etc/init.d",
         "/etc/opt", "/run/lock", "/var/cache", "/var/cache/newpkg",
@@ -487,6 +490,8 @@ void initramfs_init(void)
               _binary_mini_z3_end },
             { "/usr/share/doom/doom1.wad", _binary_doom1_wad_start,
               _binary_doom1_wad_end },
+            { "/baseq2/pak0.pak", _binary_q2pak0_pak_start,
+              _binary_q2pak0_pak_end },
         };
         for (size_t i = 0; i < sizeof(files) / sizeof(files[0]); i++) {
             size_t len = (size_t)(files[i].end - files[i].start);
@@ -589,9 +594,6 @@ void initramfs_init(void)
         } pkgs[] = {
             { "/tmp/hello-new-1.0.0-x86_64.new",
               _binary_sample_new_start, _binary_sample_new_end },
-            { "/tmp/gnu-coreutils.new",
-              _binary_gnu_coreutils_new_start,
-              _binary_gnu_coreutils_new_end },
             { "/tmp/newos-sdk.new",
               _binary_newos_sdk_new_start,
               _binary_newos_sdk_new_end },
