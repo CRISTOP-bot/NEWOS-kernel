@@ -242,7 +242,15 @@ void fb_init_early(u64 phys, u64 width, u64 height, u64 pitch, u32 bpp,
     fbm_x = fbm_y = -1;
 
     fb_clear(FBCON_BG);
-    console_register(&g_fbcon);
+    /* Register fbcon once; a GPU driver may rebind the panel later by
+     * calling fb_init_early() again with the device's own framebuffer. */
+    {
+        static int fbcon_registered;
+        if (!fbcon_registered) {
+            console_register(&g_fbcon);
+            fbcon_registered = 1;
+        }
+    }
     pr_info("fb: %llux%llu pitch %llu bpp %u, UC window %p\n",
             width, height, pitch, (unsigned)bpp, (void *)base);
 }

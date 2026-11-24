@@ -21,6 +21,7 @@
 #include <x86_fpu.h>
 #include <drivers/ata.h>
 #include <drivers/hda.h>
+#include <drivers/bga.h>
 #include <net/net_stack.h>
 #include <iru_string.h>
 
@@ -1085,6 +1086,38 @@ struct ktest2 {
     int (*fn)(void);
 };
 
+static int ktest2_bga_gpu(void)
+{
+    u64 w, h, pitch, fw, fh, fpitch;
+    u32 bpp, fbpp;
+
+    if (!bga_present()) {
+        printk("    bga-gpu: no Bochs/VBE GPU attached, skipped\n");
+        return 0;                 /* BGA is optional (Limine fb otherwise) */
+    }
+    bga_geometry(&w, &h, &pitch, &bpp);
+    fb_geometry(&fw, &fh, &fpitch, &fbpp);
+
+    /* The kernel framebuffer must be the device's scanout: same geometry
+     * and physical base, proving pixels come from the actual GPU. */
+    if (w < 64 || h < 64 || w > 4096 || h > 4096) {
+        printk("    bga-gpu: bad device mode %llux%llu\n", w, h);
+        return -1;
+    }
+    if (w != fw || h != fh || bpp != fbpp || pitch != fpitch) {
+        printk("    bga-gpu: fb mismatch: dev %llux%llu/%u p%llu vs fb %llux%llu/%u p%llu\n",
+               w, h, bpp, pitch, fw, fh, fbpp, fpitch);
+        return -1;
+    }
+    if (bga_framebuffer_phys() == 0) {
+        printk("    bga-gpu: device framebuffer address is zero\n");
+        return -1;
+    }
+    printk("    bga-gpu: display %llux%llu bpp %u from device @ 0x%llx\n",
+           w, h, bpp, bga_framebuffer_phys());
+    return 0;
+}
+
 static const struct ktest2 ktests2[] = {
     { "pmm-phys",    ktest2_phys        },
     { "address-spaces", ktest2_address_space },
@@ -1102,6 +1135,7 @@ static const struct ktest2 ktests2[] = {
     { "net-ping",    ktest2_net_ping    },
     { "net-e1000",   ktest2_net_e1000   },
     { "hda",         ktest2_hda         },
+    { "bga-gpu",     ktest2_bga_gpu     },
 };
 
 int run_phase2_tests(void)
