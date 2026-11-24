@@ -149,7 +149,9 @@ struct process *process_create_args(const char *path, const char *name,
         return NULL;
     struct vfs_file *f = vfs_open(path, VFS_O_READ);
     if (!f) {
-        printk("proc: cannot open '%s'\n", path);
+        /* Normal path probing: nsh tries /bin, /usr/bin, /sbin before
+         * falling back to busybox, so a miss is not an error. */
+        pr_debug("proc: cannot open '%s'\n", path);
         return NULL;
     }
 

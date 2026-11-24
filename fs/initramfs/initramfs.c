@@ -41,36 +41,8 @@ extern const u8 _binary_wallpaper_bmp_end[];
     extern const u8 _binary_##n##_elf_start[];    \
     extern const u8 _binary_##n##_elf_end[];
 
-DECL_BIN(ls)
-DECL_BIN(cat)
-DECL_BIN(echo)
 DECL_BIN(img)
 DECL_BIN(vid)
-DECL_BIN(about)
-DECL_BIN(newfetch)
-DECL_BIN(mkdir)
-DECL_BIN(rmdir)
-DECL_BIN(rm)
-DECL_BIN(mv)
-DECL_BIN(touch)
-DECL_BIN(pwd)
-DECL_BIN(clear)
-DECL_BIN(uname)
-DECL_BIN(hostname)
-DECL_BIN(whoami)
-DECL_BIN(id)
-DECL_BIN(date)
-DECL_BIN(uptime)
-DECL_BIN(ps)
-DECL_BIN(kill)
-DECL_BIN(sleep)
-DECL_BIN(free)
-DECL_BIN(df)
-DECL_BIN(wc)
-DECL_BIN(head)
-DECL_BIN(grep)
-DECL_BIN(find)
-DECL_BIN(sort)
 DECL_BIN(newpkg)
 DECL_BIN(frotz)
 DECL_BIN(doom)
@@ -152,36 +124,8 @@ static const struct {
     const u8 *end;
 } bin_table[] = {
 #define BIN(n) { #n, _binary_##n##_elf_start, _binary_##n##_elf_end },
-    BIN(ls)
-    BIN(cat)
-    BIN(echo)
     BIN(img)
     BIN(vid)
-    BIN(about)
-    BIN(newfetch)
-    BIN(mkdir)
-    BIN(rmdir)
-    BIN(rm)
-    BIN(mv)
-    BIN(touch)
-    BIN(pwd)
-    BIN(clear)
-    BIN(uname)
-    BIN(hostname)
-    BIN(whoami)
-    BIN(id)
-    BIN(date)
-    BIN(uptime)
-    BIN(ps)
-    BIN(kill)
-    BIN(sleep)
-    BIN(free)
-    BIN(df)
-    BIN(wc)
-    BIN(head)
-    BIN(grep)
-    BIN(find)
-    BIN(sort)
     BIN(newpkg)
     BIN(frotz)
     BIN(ping)
@@ -428,6 +372,20 @@ void initramfs_init(void)
         "    newos_syscall3(1, 1, (long)msg, (long)text_len(msg));  /* SYS_WRITE */\n"
         "    return 0;\n"
         "}\n";
+    /* Full-libc tcc smoke test (canonical copy: ports/tcc/main.c). */
+    static const char tcc_main[] =
+        "/* NEWOS tcc test: full-libc edition (ports/tcc/main.c). */\n"
+        "#include <stdio.h>\n"
+        "\n"
+        "int main(int argc, char **argv)\n"
+        "{\n"
+        "    puts(\"TCC libc OK (puts)\");\n"
+        "    printf(\"TCC libc OK: %d + %d = %d, 0x%02x = %d\\n\",\n"
+        "           6, 7, 6 + 7, 0x2a, 42);\n"
+        "    if (argc > 0)\n"
+        "        printf(\"argv[0] = %s\\n\", argv[0]);\n"
+        "    return 0;\n"
+        "}\n";
 
     struct write_req {
         const char *path;
@@ -448,6 +406,7 @@ void initramfs_init(void)
         { "/root/README", root_readme },
         { "/home/user/README", user_readme },
         { "/etc/tcc-hello.c", tcc_demo },
+        { "/etc/tcc-main.c", tcc_main },
     };
     for (size_t i = 0; i < sizeof(dotfiles) / sizeof(dotfiles[0]); i++) {
         if (vfs_create(dotfiles[i].path) != 0)
