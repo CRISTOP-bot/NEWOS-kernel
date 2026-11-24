@@ -43,7 +43,6 @@ extern const u8 _binary_wallpaper_bmp_end[];
 
 DECL_BIN(touch)
 DECL_BIN(rm)
-DECL_BIN(desktop)
 DECL_BIN(img)
 DECL_BIN(vid)
 DECL_BIN(newpkg)
@@ -60,6 +59,8 @@ DECL_BIN(wifi)
 DECL_BIN(beep)
 DECL_BIN(root)
 DECL_BIN(sudo)
+DECL_BIN(newinstall)
+DECL_BIN(sysrestore)
 DECL_BIN(quake2)
 
 /* Host-built static Linux/musl programs from the vendored ports. Both run
@@ -131,7 +132,6 @@ static const struct {
 #define BIN(n) { #n, _binary_##n##_elf_start, _binary_##n##_elf_end },
     BIN(touch)
     BIN(rm)
-    BIN(desktop)
     BIN(img)
     BIN(vid)
     BIN(newpkg)
@@ -145,6 +145,7 @@ static const struct {
     BIN(beep)
     BIN(root)
     BIN(sudo)
+    BIN(newinstall)
     BIN(quake2)
     BIN(doom)
     BIN(busybox)
@@ -169,6 +170,9 @@ static const struct {
     { "rc-status", _binary_rc_status_elf_start, _binary_rc_status_elf_end },
     { "rc-update", _binary_rc_update_elf_start, _binary_rc_update_elf_end },
     { "rc-service", _binary_rc_service_elf_start, _binary_rc_service_elf_end },
+    /* Restores the /bin/newinstall snapshot before services and console. */
+    { "sysrestore", _binary_sysrestore_elf_start,
+      _binary_sysrestore_elf_end },
 };
 
 static void install_blob(const char *path, const u8 *data, size_t len,
@@ -305,6 +309,23 @@ void initramfs_init(void)
 
     /* Classic dotfiles. */
     static const char hostname[] = "newos\n";
+    /* Settings managed by /bin/newinstall. `session=gui` also starts the
+     * desktop without the gui=1 cmdline, so an installed system boots the
+     * chosen session by itself (test_mode/headless still win). */
+    static const char newos_conf[] =
+        "# Managed by /bin/newinstall.\n"
+        "session=text\nhostname=newos\nuser=user\nprofile=2\n";
+    /* Example answer file: `newinstall /etc/installer.answers` runs the
+     * installer non-interactively (also used by make check-installer). */
+    static const char installer_answers[] =
+        "# NEWOS installer answers (copy and edit for your own install)\n"
+        "profile=desktop\n"
+        "hostname=newos-installed\n"
+        "user=installer\n"
+        "session=text\n"
+        "copy_base=no\n"     /* keeps the self-test snapshot small */
+        "assets=no\n"
+        "packages=hello-new\n";
     static const char passwd[] =
         "root:x:0:0:root:/root:/bin/sh\n"
         "user:x:1000:1000:user:/home/user:/bin/sh\n";
@@ -403,6 +424,8 @@ void initramfs_init(void)
     };
     static const struct write_req dotfiles[] = {
         { "/etc/hostname", hostname },
+        { "/etc/newos.conf", newos_conf },
+        { "/etc/installer.answers", installer_answers },
         { "/etc/passwd", passwd },
         { "/etc/group", group },
         { "/etc/shells", shells },
