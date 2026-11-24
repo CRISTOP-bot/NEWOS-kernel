@@ -55,6 +55,8 @@ DECL_BIN(ifconfig)
 DECL_BIN(nslookup)
 DECL_BIN(wifi)
 DECL_BIN(beep)
+DECL_BIN(root)
+DECL_BIN(sudo)
 DECL_BIN(quake2)
 
 /* Host-built static Linux/musl programs from the vendored ports. Both run
@@ -135,6 +137,8 @@ static const struct {
     BIN(nslookup)
     BIN(wifi)
     BIN(beep)
+    BIN(root)
+    BIN(sudo)
     BIN(quake2)
     BIN(doom)
     BIN(busybox)

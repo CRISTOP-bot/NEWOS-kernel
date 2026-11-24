@@ -203,8 +203,9 @@ struct process *process_create_args(const char *path, const char *name,
     strncpy(p->name, name, sizeof(p->name) - 1);
     p->state = PROCESS_STATE_NEW;
     p->exit_code = -1;
-    p->cwd[0] = '/';
-    p->cwd[1] = '\0';
+    /* Boot into the user's home so the shell starts in a familiar place. */
+    strncpy(p->cwd, "/home/user", sizeof(p->cwd) - 1);
+    p->cwd[sizeof(p->cwd) - 1] = '\0';
 
     /* Standard fds -> serial console. */
     for (int i = 0; i < 3; i++)
