@@ -10,6 +10,7 @@
 #include <core/core_printk.h>
 #include <core/core_time.h>
 #include <core/core_version.h>
+#include <core/core_cpuinfo.h>
 #include <mm/mm_pmm.h>
 #include <iru_format.h>
 #include <iru_string.h>
@@ -27,6 +28,7 @@ enum procfs_kind {
     PROCFS_CMDLINE,
     PROCFS_UPTIME,
     PROCFS_MEMINFO,
+    PROCFS_CPUINFO,
     PROCFS_FILESYSTEMS,
     PROCFS_MOUNTS,
 };
@@ -41,6 +43,7 @@ static const struct procfs_file procfs_files[] = {
     { "cmdline",     PROCFS_CMDLINE     },
     { "uptime",      PROCFS_UPTIME      },
     { "meminfo",     PROCFS_MEMINFO     },
+    { "cpuinfo",     PROCFS_CPUINFO     },
     { "filesystems", PROCFS_FILESYSTEMS },
     { "mounts",      PROCFS_MOUNTS      },
 };
@@ -117,6 +120,9 @@ static size_t procfs_render(enum procfs_kind kind, char *buf, size_t size)
             "SwapFree:       0 kB\n",
             total_kb, free_kb, free_kb, used_kb);
     }
+
+    case PROCFS_CPUINFO:
+        return arch_cpuinfo_render(buf, size);
 
     case PROCFS_FILESYSTEMS:
         return procfs_copy(buf, size, procfs_filesystems);

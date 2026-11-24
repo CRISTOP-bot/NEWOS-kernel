@@ -29,6 +29,7 @@ enum sysfs_kind {
     SYSFS_PCI_VENDOR,
     SYSFS_PCI_DEVICE,
     SYSFS_PCI_CLASS,
+    SYSFS_PCI_MODALIAS,
 };
 
 struct sysfs_attr {
@@ -71,6 +72,20 @@ static size_t sysfs_render(const struct sysfs_attr *attr, char *buf,
     case SYSFS_PCI_CLASS:
         return sysfs_format(buf, size, "0x%06x\n",
                             (u64)attr->dev->class);
+    case SYSFS_PCI_MODALIAS: {
+        /* Linux modalias format consumed by fastfetch's GPU detector:
+         * pci:vVVVVdDDDDsvSSSSsdSSSSbcCCscSSiIF */
+        const struct pci_dev_info *info = attr->dev->private;
+        if (!info)
+            return (size_t)-1;
+        u64 cls = attr->dev->class;   /* 0xCCSSIF */
+        /* Linux modalias pads IDs to 8 hex digits. fastfetch's sscanf uses
+         * %8x, so 4-digit IDs would swallow the `d` separator. */
+        return sysfs_format(buf, size,
+            "pci:v%08xd%08xsv00000000sd00000000bc%02xsc%02xi%02x\n",
+            (u64)info->vendor, (u64)info->device,
+            (cls >> 16) & 0xFF, (cls >> 8) & 0xFF, cls & 0xFF);
+    }
     }
     return (size_t)-1;
 }
@@ -168,9 +183,10 @@ static void sysfs_add_pci(struct device *dev, void *arg)
     struct vfs_inode *dir = sysfs_add_dir(ctx->devices, name);
     if (!dir)
         return;
-    sysfs_add_attr(dir, "vendor", SYSFS_PCI_VENDOR, dev);
-    sysfs_add_attr(dir, "device", SYSFS_PCI_DEVICE, dev);
-    sysfs_add_attr(dir, "class",  SYSFS_PCI_CLASS,  dev);
+    sysfs_add_attr(dir, "vendor",   SYSFS_PCI_VENDOR,   dev);
+    sysfs_add_attr(dir, "device",   SYSFS_PCI_DEVICE,   dev);
+    sysfs_add_attr(dir, "class",    SYSFS_PCI_CLASS,    dev);
+    sysfs_add_attr(dir, "modalias", SYSFS_PCI_MODALIAS, dev);
 }
 
 static struct vfs_inode *g_sys_root;
