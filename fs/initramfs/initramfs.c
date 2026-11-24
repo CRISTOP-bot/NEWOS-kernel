@@ -89,6 +89,7 @@ DECL_BIN(quake2)
  * through the Linux-compatible SYSCALL entry (see ports/tcc and ports/nano). */
 DECL_BIN(nano)
 DECL_BIN(tcc)
+DECL_BIN(fastfetch)
 
 /* VOXEL classic desktop (MIT, ports/voxel): NEWOS-native ELF built from
  * source by scripts/build-voxel.sh. */
@@ -196,6 +197,7 @@ static const struct {
     BIN(glxgears)
     BIN(nano)
     BIN(tcc)
+    BIN(fastfetch)
     BIN(voxel)
 };
 
