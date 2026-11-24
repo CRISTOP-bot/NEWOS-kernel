@@ -1085,8 +1085,11 @@ long syscall_posix(struct x64_iframe *f, u64 nr)
         return SYSCALL_RET_ERROR;
 
     default:
-        printk("syscall_posix: pid %u: unknown syscall %llu\n",
-               p ? (unsigned)p->pid : 0, nr);
+        /* Unknown syscalls are common with unmodified Linux static binaries
+         * (e.g. fastfetch probes rseq/statx). Return the error without
+         * spamming the shared console; pr_debug is filtered in printk_lvl. */
+        pr_debug("syscall_posix: pid %u: unknown syscall %llu\n",
+                 p ? (unsigned)p->pid : 0, nr);
         return SYSCALL_RET_ERROR;
     }
 }

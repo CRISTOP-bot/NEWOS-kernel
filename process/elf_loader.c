@@ -86,8 +86,8 @@ int elf_validate(struct elf_image *img)
         return -1;
     }
     if (has_tls)
-        printk("proc: ELF64 has PT_TLS - loader ignores it, the program "
-               "must set its own FS base via SYS_ARCH_PRCTL\n");
+        pr_debug("proc: ELF64 has PT_TLS - loader ignores it, the program "
+                 "must set its own FS base via SYS_ARCH_PRCTL\n");
 
     img->entry = eh->e_entry;
     img->load_start = ~0ull;

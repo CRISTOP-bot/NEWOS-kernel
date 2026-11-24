@@ -343,9 +343,11 @@ struct process *process_create_args(const char *path, const char *name,
     p->thread.process = p;
 
     kfree(buf);
-    printk("proc: %s pid=%u entry=%p segments=%d stack [%llx, %llx)\n",
-           p->name, (unsigned)p->pid, p->entry, img.nsegments,
-           p->user_stack_start, p->user_stack_start + p->user_stack_size);
+    /* Per-spawn diagnostics are noise on the shell console; pr_debug is
+     * filtered by printk_lvl(KLOG_DEBUG). Keep real faults at printk level. */
+    pr_debug("proc: %s pid=%u entry=%p segments=%d stack [%llx, %llx)\n",
+             p->name, (unsigned)p->pid, p->entry, img.nsegments,
+             p->user_stack_start, p->user_stack_start + p->user_stack_size);
     return p;
 
 fail:
