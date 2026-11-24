@@ -12,7 +12,7 @@
 
 /* initramfs: the boot-time root filesystem. In this phase the kernel
  * populates a tmpfs-backed root from built-in definitions (including the
- * embedded /bin/hello + /init images). Later this module parses a cpio
+ * embedded userland ELF blobs). Later this module parses a cpio
  * archive passed by the boot loader as a multiboot module. */
 
 #define DEFAULT_ROOT_DIRS \
@@ -41,6 +41,9 @@ extern const u8 _binary_wallpaper_bmp_end[];
     extern const u8 _binary_##n##_elf_start[];    \
     extern const u8 _binary_##n##_elf_end[];
 
+DECL_BIN(touch)
+DECL_BIN(rm)
+DECL_BIN(desktop)
 DECL_BIN(img)
 DECL_BIN(vid)
 DECL_BIN(newpkg)
@@ -126,6 +129,9 @@ static const struct {
     const u8 *end;
 } bin_table[] = {
 #define BIN(n) { #n, _binary_##n##_elf_start, _binary_##n##_elf_end },
+    BIN(touch)
+    BIN(rm)
+    BIN(desktop)
     BIN(img)
     BIN(vid)
     BIN(newpkg)

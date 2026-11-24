@@ -384,13 +384,11 @@ static int cmdline_has_test_mode(void)
 /* -------------------------------------------------------------------------
  * Phase 2: userland bootstrap.
  *
- * The kernel tries /sbin/openrc-init (the OpenRC service manager, present
- * when the image ships it) and falls back to the interactive shell (/bin/sh,
- * then /init). Session policy belongs to userland: openrc-init reads
- * /etc/inittab and starts the console shell with --session, and a plain
- * shell reads the boot cmdline and starts the desktop itself for `gui=1`.
- * Keeping the fallback chain means a missing or crashing init can never
- * strand the machine without a shell.
+ * /sbin/openrc-init is the sole PID 1 — there is no /init fallback. Session
+ * policy belongs to userland: openrc-init reads /etc/inittab and starts the
+ * console shell with --session, and that shell reads the boot cmdline to
+ * launch the fullscreen graphical session for `gui=1`. A missing init fails
+ * the boot rather than silently dropping into an unmanaged shell.
  * ---------------------------------------------------------------------- */
 
 static int s_user_done;
